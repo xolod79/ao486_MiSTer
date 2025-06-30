@@ -38,7 +38,7 @@ module system
 	output        ps2_reset_n,
 
 	input   [5:0] bootcfg,
-  input         uma_ram,
+	input         uma_ram,
 	output  [7:0] syscfg,
 
 	input         clk_uart1,
@@ -133,6 +133,11 @@ wire        dma_sb_ack_16;
 wire  [7:0] dma_sb_readdata_8;
 wire [15:0] dma_sb_readdata_16;
 wire [15:0] dma_sb_writedata;
+wire        dma_gus_req;
+wire        dma_gus_ack;
+wire        dma_gus_tc;
+wire [15:0] dma_gus_readdata;
+wire [15:0] dma_gus_writedata;
 wire [15:0] dma_readdata;
 wire        dma_waitrequest;
 wire [23:0] dma_address;
@@ -154,7 +159,7 @@ wire        interrupt_done;
 wire        interrupt_do;
 wire  [7:0] interrupt_vector;
 reg  [15:0] interrupt;
-wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_12, irq_14, irq_15;
+wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_11, irq_12, irq_14, irq_15;
 
 wire        cpu_io_read_do;
 wire [15:0] cpu_io_read_address;
@@ -187,6 +192,7 @@ reg         joy_cs;
 reg         rtc_cs;
 reg         fm_cs;
 reg         sb_cs;
+reg         gus_cs;
 reg         uart1_cs;
 reg         uart2_cs;
 reg         mpu_cs;
@@ -198,6 +204,7 @@ reg         sysctl_cs;
 wire        fdd0_inserted;
 
 wire  [7:0] sound_readdata;
+wire [15:0] gus_readdata;
 wire  [7:0] floppy0_readdata;
 wire [31:0] ide0_readdata;
 wire [31:0] ide1_readdata;
@@ -334,6 +341,7 @@ always @(posedge clk_sys) begin
 	rtc_cs        <= ({iobus_address[15:1], 1'd0} == 16'h0070);
 	fm_cs         <= ({iobus_address[15:2], 2'd0} == 16'h0388);
 	sb_cs         <= ({iobus_address[15:4], 4'd0} == 16'h0220);
+	gus_cs        <= ({iobus_address[15:4], 4'd0} == 16'h0240) || ({iobus_address[15:4], 4'd0} == 16'h0340);
 	uart1_cs      <= ({iobus_address[15:3], 3'd0} == 16'h03F8);
 	uart2_cs      <= ({iobus_address[15:3], 3'd0} == 16'h02F8);
 	mpu_cs        <= ({iobus_address[15:1], 1'd0} == 16'h0330);
@@ -370,6 +378,7 @@ wire [7:0] iobus_readdata8 =
 	( ps2_io_cs|ps2_ctl_cs                   ) ? ps2_readdata      :
 	( rtc_cs                                 ) ? rtc_readdata      :
 	( sb_cs|fm_cs                            ) ? sound_readdata    :
+//	( gus_cs                                 ) ? gus_readdata      :
 	( uart1_cs                               ) ? uart1_readdata    :
 	( uart2_cs                               ) ? uart2_readdata    :
 	( mpu_cs                                 ) ? mpu_readdata      :
@@ -399,7 +408,7 @@ iobus iobus
 	.bus_io32          (((ide0_cs | ide1_cs) & ~iobus_address[9]) | sysctl_cs),
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
-	.bus_readdata      (ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : iobus_readdata8),
+	.bus_readdata      (ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : gus_cs ? gus_readdata : iobus_readdata8),
 	.bus_wait          (ide0_wait | ide1_wait)
 );
 
@@ -440,7 +449,13 @@ dma dma
 	.dma_5_req         (dma_sb_req_16),
 	.dma_5_ack         (dma_sb_ack_16),
 	.dma_5_readdata    (dma_sb_readdata_16),
-	.dma_5_writedata   (dma_sb_writedata)
+	.dma_5_writedata   (dma_sb_writedata),
+
+	.dma_7_req         (dma_gus_req),
+	.dma_7_ack         (dma_gus_ack),
+	.dma_7_tc          (dma_gus_tc),
+	.dma_7_readdata    (dma_gus_readdata),
+	.dma_7_writedata   (dma_gus_writedata)
 );
 
 floppy floppy
@@ -678,6 +693,34 @@ sound sound
 	.irq_10            (irq_10)
 );
 
+gus gus
+(
+	.clk               (clk_sys),
+//	.clk_audio         (clk_audio),
+	.reset             (reset),
+
+//	.clock_rate        (clock_rate),
+
+	.io_address8       (iobus_address[8]),
+	.io_address        (iobus_address[3:0]),
+	.writedata         (iobus_writedata[15:0]),
+	.read              (iobus_read),
+	.write             (iobus_write),
+	.readdata          (gus_readdata),
+	.gus_cs            (gus_cs),
+
+	.dma_req           (dma_gus_req),
+	.dma_ack           (dma_gus_ack),
+	.dma_tc            (dma_gus_tc),
+	.dma_readdata      (dma_gus_readdata),
+	.dma_writedata     (dma_gus_writedata),
+
+	.audio_l           (gus_l),
+	.audio_r           (gus_r),
+
+	.irq_11            (irq_11)
+);
+
 uart uart1
 (
 	.clk               (clk_sys),
@@ -829,6 +872,7 @@ always @* begin
 	interrupt[8]  = irq_8;
 	interrupt[9]  = irq_9 | irq_2;
 	interrupt[10] = irq_10;
+	interrupt[11] = irq_11;
 	interrupt[12] = irq_12;
 	interrupt[14] = irq_14;
 	interrupt[15] = irq_15;
