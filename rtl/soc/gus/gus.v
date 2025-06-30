@@ -28,7 +28,7 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 	
 	always @(posedge clk)
 	begin
-		gf1_clk <= gf1_clk + 38843;
+		gf1_clk <= gf1_clk + 14386;   // = (9878400 * 2 *65536) / 90000000
 	end
 	
 	reg [8:0] DADDR_l1;
