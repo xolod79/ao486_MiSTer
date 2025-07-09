@@ -18,6 +18,8 @@ module gf1
 	input DMA_TC,
 	input [15:0] DATA_i,
 	output [15:0] DATA_o,
+	input [15:0] dma_readdata,
+	output reg [15:0] dma_writedata,
 	input IO16,
 	input [3:0] ADDRESS,
 	output BUSA_LOW,
@@ -2550,7 +2552,7 @@ module gf1
 		
 		
 		if (DACK1 & IOW)
-			dram_dma_in_data <= DATA_i;
+			dram_dma_in_data <= dma_readdata;
 		
 		if (~dram_dma_write_state1)
 			dram_dma_hi_lo_byte_sel[0] <= ~dram_dma_hi_lo_byte_sel[1];
@@ -2573,7 +2575,7 @@ module gf1
 			dram_dma_write_state2 <= 1'h0;
 		
 		if (IOR & DACK1 & dram_dma_en & dram_dma_dir)
-			cpu_bus <= dram_dma_rd_latch;
+			dma_writedata <= dram_dma_rd_latch;
 		
 		if (IOR & DACK1)
 			dram_dma_read_state1 <= 1'h1;

@@ -13,8 +13,8 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 	output dma_req,
 	input dma_ack,
 	input dma_tc,
-	input [15:0] dma_writedata,
-	output [15:0] dma_readdata,
+	input [15:0] dma_readdata,
+	output [15:0] dma_writedata,
 	
 	output irq_11,
 	
@@ -185,6 +185,8 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 		.ADDRESS(io_address[3:0]),
 		.DATA_i(writedata),
 		.DATA_o(readdata),
+		.dma_writedata(dma_writedata),
+		.dma_readdata(dma_readdata),
 		.IO16(1),   // IO16
 		.CS1(isgf1addr),
 		.CS2(0),
