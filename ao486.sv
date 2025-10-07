@@ -769,6 +769,8 @@ system system
 	.sample_sb_r          (sb_out_r),
 	.sample_opl_l         (opl_out_l),
 	.sample_opl_r         (opl_out_r),
+	.sample_gus_l         (gus_out_l),
+	.sample_gus_r         (gus_out_r),
 	.sound_fm_mode        (status[3]),
 	.sound_cms_en         (status[17]),
 	.vol_l                (vol_l),
@@ -1006,6 +1008,7 @@ end
 
 wire [15:0] sb_out_l, sb_out_r;
 wire [15:0] opl_out_l, opl_out_r;
+wire [15:0] gus_out_l, gus_out_r;
 
 wire [15:0] cdda_l;
 wire [15:0] cdda_r;
@@ -1042,8 +1045,8 @@ always @(posedge CLK_AUDIO) begin
 	mt32_l <= volume(mt32_i2s_l, ~status[25] ? vol_midi_l : vol_en[4] ? vol_line_l : 5'd0);
 	mt32_r <= volume(mt32_i2s_r, ~status[25] ? vol_midi_r : vol_en[3] ? vol_line_r : 5'd0);
 
-	tmp_l <= {opl_out_l[15],opl_out_l} + {sb_out_l[15],sb_out_l} + spk_out + (mt32_mute ? 17'd0 : {mt32_l[15],mt32_l}) + (vol_en[2] ? {cdda_l[15],cdda_l} : 17'd0);
-	tmp_r <= {opl_out_r[15],opl_out_r} + {sb_out_r[15],sb_out_r} + spk_out + (mt32_mute ? 17'd0 : {mt32_r[15],mt32_r}) + (vol_en[1] ? {cdda_r[15],cdda_r} : 17'd0);
+	tmp_l <= {opl_out_l[15],opl_out_l} + {sb_out_l[15],sb_out_l} + {gus_out_l[15],gus_out_l} + spk_out + (mt32_mute ? 17'd0 : {mt32_l[15],mt32_l}) + (vol_en[2] ? {cdda_l[15],cdda_l} : 17'd0);
+	tmp_r <= {opl_out_r[15],opl_out_r} + {sb_out_r[15],sb_out_r} + {gus_out_r[15],gus_out_r} + spk_out + (mt32_mute ? 17'd0 : {mt32_r[15],mt32_r}) + (vol_en[1] ? {cdda_r[15],cdda_r} : 17'd0);
 
 	// clamp the output
 	out_l <= (^tmp_l[16:15]) ? {tmp_l[16], {15{tmp_l[15]}}} : tmp_l[15:0];

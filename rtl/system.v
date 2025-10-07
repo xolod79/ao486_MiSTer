@@ -70,6 +70,8 @@ module system
 	output [15:0] sample_opl_r,
 	input         sound_fm_mode,
 	input         sound_cms_en,
+	output [15:0] sample_gus_l,
+	output [15:0] sample_gus_r,
 
 	output        speaker_out,
 
@@ -203,8 +205,10 @@ reg         sysctl_cs;
 
 wire        fdd0_inserted;
 
+wire        gus_wait;
+
 wire  [7:0] sound_readdata;
-wire [15:0] gus_readdata;
+wire  [7:0] gus_readdata;
 wire  [7:0] floppy0_readdata;
 wire [31:0] ide0_readdata;
 wire [31:0] ide1_readdata;
@@ -378,7 +382,7 @@ wire [7:0] iobus_readdata8 =
 	( ps2_io_cs|ps2_ctl_cs                   ) ? ps2_readdata      :
 	( rtc_cs                                 ) ? rtc_readdata      :
 	( sb_cs|fm_cs                            ) ? sound_readdata    :
-//	( gus_cs                                 ) ? gus_readdata      :
+	( gus_cs                                 ) ? gus_readdata      :
 	( uart1_cs                               ) ? uart1_readdata    :
 	( uart2_cs                               ) ? uart2_readdata    :
 	( mpu_cs                                 ) ? mpu_readdata      :
@@ -408,8 +412,8 @@ iobus iobus
 	.bus_io32          (((ide0_cs | ide1_cs) & ~iobus_address[9]) | sysctl_cs),
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
-	.bus_readdata      (ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : gus_cs ? gus_readdata : iobus_readdata8),
-	.bus_wait          (ide0_wait | ide1_wait)
+	.bus_readdata      (ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : iobus_readdata8),
+	.bus_wait          (ide0_wait | ide1_wait | gus_wait)
 );
 
 dma dma
@@ -696,18 +700,16 @@ sound sound
 gus gus
 (
 	.clk               (clk_sys),
-//	.clk_audio         (clk_audio),
 	.reset             (reset),
-
-//	.clock_rate        (clock_rate),
 
 	.io_address8       (iobus_address[8]),
 	.io_address        (iobus_address[3:0]),
-	.writedata         (iobus_writedata[15:0]),
+	.writedata         (iobus_writedata[7:0]),
 	.read              (iobus_read),
 	.write             (iobus_write),
 	.readdata          (gus_readdata),
 	.gus_cs            (gus_cs),
+	.io_wait           (gus_wait),
 
 	.dma_req           (dma_gus_req),
 	.dma_ack           (dma_gus_ack),
@@ -715,8 +717,8 @@ gus gus
 	.dma_readdata      (dma_gus_readdata),
 	.dma_writedata     (dma_gus_writedata),
 
-	.audio_l           (gus_l),
-	.audio_r           (gus_r),
+	.audio_l           (sample_gus_l),
+	.audio_r           (sample_gus_r),
 
 	.irq_11            (irq_11)
 );

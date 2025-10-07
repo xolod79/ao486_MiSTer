@@ -588,16 +588,23 @@ module gf1
 	
 	wire dram_cpu_poke = cpu_write & CS1 & cpu_addr_7;
 	wire dram_cpu_peek = cpu_read & CS1 & cpu_addr_7;
-	wire dram_cpu_pp = dram_cpu_poke | dram_cpu_peek;
-	wire dram_pp_enable = dram_io_pp & ~dram_io_wr_dma & (~dram_io_rd_dma | dram_io_wr_dma);
-	
+//	wire dram_cpu_pp = dram_cpu_poke | dram_cpu_peek;
+	wire dram_cpu_pp = dram_cpu_poke | dram_cpu_peek | dram_cpu_poke_t | dram_cpu_peek_t;
+//	wire dram_pp_enable = dram_io_pp & ~dram_io_wr_dma & (~dram_io_rd_dma | dram_io_wr_dma);
+	wire dram_pp_enable = dram_io_pp & ~dram_io_wr_dma & ~dram_io_rd_dma;
+
+	reg dram_cpu_poke_t;
+	reg dram_cpu_peek_t;
+	reg dram_pp_state_d;
+
 	reg dram_pp_state;
 	
-	wire dram_pp_wait = ~reset_reg & (dram_cpu_pp & ~dram_pp_state);
+	wire dram_pp_wait = ~reset_reg & (dram_cpu_pp & ~dram_pp_state_d);
 	
 	wire cpu_dram_access = dram_io_pp | dram_io_wr_dma | dram_io_rd_dma;
 	
-	wire dram_io_dir = dram_io_wr_dma | (dram_pp_enable & ~dram_cpu_peek);
+//	wire dram_io_dir = dram_io_wr_dma | (dram_pp_enable & ~dram_cpu_peek);
+	wire dram_io_dir = dram_io_wr_dma | (dram_pp_enable & ~dram_cpu_peek & ~dram_cpu_peek_t);
 	
 	wire dram_cpu_access_16 = dram_dma_chan_width & (dram_io_rd_dma | dram_io_wr_dma);
 	reg dram_voice_access_16;
@@ -666,7 +673,8 @@ module gf1
 	wire wait_voice_write = glob_data_exec & glob_data_wr2;
 	wire wait_voice_read = (glob_data_rd3 & cpu_read & CS1 & (cpu_addr_4 | cpu_addr_5)) | (glob_data_wr2 & cpu_write3);
 	
-	assign WAIT = dram_pp_wait | wait_voice_read | wait_voice_write;
+	//assign WAIT = dram_pp_wait | wait_voice_read | wait_voice_write;
+	assign WAIT = dram_pp_wait_d | wait_voice_read | wait_voice_write;
 	
 	reg ram_strobe;
 	reg ram_wr_strobe;
@@ -784,6 +792,8 @@ module gf1
 	reg w262;
 	reg w262_l[0:2];
 	
+	reg dram_pp_wait_d;
+	
 	always @(posedge MCLK)
 	begin
 		if (!CLK)
@@ -884,7 +894,21 @@ module gf1
 		if (clk1)
 			chan_irq_l <= chan_irq;
 		
+		dram_pp_wait_d <= dram_pp_wait;
 		
+
+// !!!
+	if (dram_cpu_poke) dram_cpu_poke_t <= 1;
+	if (dram_cpu_peek) dram_cpu_peek_t <= 1;
+
+	if (dram_pp_state) begin
+		dram_cpu_poke_t <= 0;
+		dram_cpu_peek_t <= 0;
+	end
+
+	dram_pp_state_d <= dram_pp_state;
+	// !!!
+
 		// IO
 		
 		if (glob_reg_l2[7:6] != 2'h0 | reset_reg | glob_data_wr2)
@@ -2168,33 +2192,39 @@ module gf1
 			timer_ctrl_b1 <= 1'h0;
 			timer_ctrl_b0_l <= 1'h0;
 			timer_ctrl_b0 <= 1'h0;
-			
+
 			gf1_irq_enable_l <= 1'h0;
 			gf1_irq_enable <= 1'h0;
 			dac_enable_l <= 1'h0;
 			dac_enable <= 1'h0;
+
+// !!!!!
+			dram_cpu_poke_t <= 1'h0;
+			dram_cpu_peek_t <= 1'h0;
+// !!!!!
 		end
-		
+
 		if (reset_reg | (dram_dma_tc & (dram_dma_dir | cls9_dma_write)))
 		begin
 			dram_dma_en_l <= 1'h0;
 			dram_dma_en <= 1'h0;
 		end
-		
+
 		if (RESET)
 		begin
 			reset_reg_not_l <= 1'h0;
 			reset_reg_not <= 1'h0;
 		end
-		
+
 		if (((cpu_write_4 & IO16) | cpu_write_5) & glob_addr_43)
 			dram_peek_address[15:0] <= glob_data_l2;
+
 		if (cpu_write_5 & glob_addr_44)
 			dram_peek_address[19:16] <= glob_data_l2[11:8];
-		
+
 		if (glob_addr_41)
 		begin
-			glob_read_mux = { 
+			glob_read_mux = {
 				dram_dma_invert_msb,
 				dram_dma_irq_pending,
 				dram_dma_irq_en_l,
@@ -2259,8 +2289,8 @@ module gf1
 					cpu_bus <= glob_read_mux;
 				if (cpu_addr_6) // irq status
 					cpu_bus[7:0] <= { dma_tc_irq, ramp_irq, wave_irq, blaster_io_irq, timer2_irq, timer1_irq, midi_rx_irq, midi_tx_irq };
-				if (cpu_addr_7) // mem peek
-					cpu_bus[7:0] <= peek_reg;
+//				if (cpu_addr_7) // mem peek
+//					cpu_bus[7:0] <= peek_reg;
 				if (cpu_addr_8) // adlib status
 				begin
 					if (~timer_ctrl_b0)
@@ -2538,22 +2568,21 @@ module gf1
 			dram_dma_req_wr2 <= 1'h1;
 		else if (DACK1 | ~dram_dma_en)
 			dram_dma_req_wr2 <= 1'h0;
-		
+
 		if (dram_refresh_slot)
 			dram_dma_clk_cnt[0] <= dram_dma_clk_cnt[1] + 3'h1;
 		else
 			dram_dma_clk_cnt[1] <= dram_dma_clk_cnt[0];
-		
+
 		if (reset_reg)
 		begin
 			dram_dma_clk_cnt[0] <= 0;
 			dram_dma_clk_cnt[1] <= 0;
 		end
-		
-		
+
 		if (DACK1 & IOW)
 			dram_dma_in_data <= dma_readdata;
-		
+
 		if (~dram_dma_write_state1)
 			dram_dma_hi_lo_byte_sel[0] <= ~dram_dma_hi_lo_byte_sel[1];
 		else
@@ -2563,36 +2592,35 @@ module gf1
 			dram_dma_hi_lo_byte_sel[0] <= 1'h0;
 			dram_dma_hi_lo_byte_sel[1] <= 1'h0;
 		end
-		
+
 		if (IOW & DACK1)
 			dram_dma_write_state1 <= 1'h1;
 		else if (dram_dma_dir | ~dram_dma_en | dram_dma_write_state2)
 			dram_dma_write_state1 <= 1'h0;
-		
+
 		if (dram_dma_write_state1 & ~IOW)
 			dram_dma_write_state2 <= 1'h1;
 		else if (cls9_dma_write | ~dram_dma_en)
 			dram_dma_write_state2 <= 1'h0;
-		
+
 		if (IOR & DACK1 & dram_dma_en & dram_dma_dir)
 			dma_writedata <= dram_dma_rd_latch;
-		
+
 		if (IOR & DACK1)
 			dram_dma_read_state1 <= 1'h1;
 		else if (~dram_dma_en | dram_dma_read_state2)
 			dram_dma_read_state1 <= 1'h0;
-		
+
 		if (dram_dma_en | (IOR & ~dram_dma_read_state1))
 			dram_dma_read_state2 <= 1'h1;
 		else if (cls9_dma_read)
 			dram_dma_read_state2 <= 1'h0;
-		
+
 		if (dram_dma_read_state2 & dram_dma_dir & dram_dma_tick)
 			dram_dma_read_state3 <= 1'h1;
 		else if (cls9_dma_read | ~dram_dma_en)
 			dram_dma_read_state3 <= 1'h0;
-		
-		
+
 		if (((cpu_write_4 & IO16) | cpu_write_5) & glob_addr_42)
 		begin
 			dram_dma_address[0] <= { glob_data_l2, 4'h0 };
@@ -2602,23 +2630,22 @@ module gf1
 			dram_dma_address[0] <= dram_dma_address[1] + 20'h1;
 		else
 			dram_dma_address[1] <= dram_dma_address[0];
-		
-		
+
 		if (~clk_sel[1])
 			dram_io_wr_dma_l = dram_dma_write_state2;
 		else
 			dram_io_wr_dma = dram_io_wr_dma_l;
-		
+
 		if (~clk_sel[1])
 			dram_io_rd_dma_l = dram_dma_read_state3;
 		else
 			dram_io_rd_dma = dram_io_rd_dma_l;
-		
+
 		if (~clk_sel[1])
 			dram_io_pp_l = dram_cpu_pp;
 		else
 			dram_io_pp = dram_io_pp_l;
-		
+
 		if (dram_refresh_slot | clk_sel[14] | reset_reg)
 		begin
 			dram_io_wr_dma_l = 1'h0;
@@ -2628,18 +2655,20 @@ module gf1
 			dram_io_pp_l = 1'h0;
 			dram_io_pp = 1'h0;
 		end
-		
+
 		if (reset_reg | ~dram_cpu_pp)
 			dram_pp_state <= 1'h0;
 		else if (clk_sel[9] & dram_pp_enable)
 			dram_pp_state <= 1'h1;
-		
-		if (dram_cpu_pp & ~dram_pp_state)
-			peek_reg <= dram_bus[7:0];
-		
+
+//		if (dram_cpu_pp & ~dram_pp_state)
+//			peek_reg <= dram_bus[7:0];
+		if (dram_cpu_peek_t  & ~dram_pp_state)
+			cpu_bus[7:0] <= dram_bus[7:0];
+
 		if (clk3)
 			dram_voice_access_16 <= wave_params[2];
-		
+
 		if (dram_cpu_access_16 & clk_sel[1])
 			dram_access_16 <= 1'h1;
 		if (~dram_cpu_access_16 & clk_sel[1])
@@ -2648,25 +2677,25 @@ module gf1
 			dram_access_16 <= 1'h1;
 		if (~dram_voice_access_16 & clk_sel[9])
 			dram_access_16 <= 1'h0;
-		
+
 		if (clk_sel[2] | clk_sel[10])
 			dram_in_16 <= dram_access_16;
-		
+
 		if (clk_sel[2] & dram_io_dir)
 			DRAM_WE <= 1'h1;
 		if (clk_sel[9])
 			DRAM_WE <= 1'h0;
-		
+
 		if (clk_sel[6] | clk_sel[14])
 			dram_subaddr <= 1'h1;
 		if (clk_sel[9] | clk_sel[1])
 			dram_subaddr <= 1'h0;
-		
+
 		if (clk_sel[1])
 			dram_addr_cw_sel <= 1'h1;
 		else if (clk_sel[9])
 			dram_addr_cw_sel <= 1'h0;
-		
+
 		if (clk_sel[8] & clk_sel[9])
 			dram_hi_sel <= 1'h1;
 		if (clk_sel[11])
@@ -2675,7 +2704,7 @@ module gf1
 			dram_hi_sel <= 1'h1;
 		if (clk_sel[3])
 			dram_hi_sel <= 1'h0;
-		
+
 		if (~dram_io_dir)
 		begin
 			dram_bus[15:8] <= dram_in[15:8];
@@ -2684,13 +2713,14 @@ module gf1
 			else
 				dram_bus[7:0] <= dram_in[15:8];
 		end
-		if (dram_io_dir & dram_pp_enable & dram_cpu_poke)
+//		if (dram_io_dir & dram_pp_enable & dram_cpu_poke)
+		if (dram_io_dir & dram_pp_enable & (dram_cpu_poke | dram_cpu_poke_t))
 			dram_bus[7:0] <= cpu_bus[7:0];
 		if (dram_io_dir & dram_dma_access & ~dram_dma_dir)
 			dram_bus <= dram_dma_in_data_sign;
 		if (dram_dma_read_state3)
 			dram_dma_rd_latch <= dram_bus;
-		
+
 		if (clk_sel[10])
 			DRAM_RAS <= 1'h1;
 		if (clk_sel[16])
@@ -2701,7 +2731,7 @@ module gf1
 			DRAM_RAS <= 1'h1;
 		if (clk_sel[7] & clk_sel[8])
 			DRAM_RAS <= 1'h0;
-		
+
 		if (clk_sel[11] & clk_sel[12])
 			dram_cas <= 1'h1;
 		if (clk_sel[13] & clk_sel[14] & dram_voice_access_16)
@@ -2710,7 +2740,7 @@ module gf1
 			dram_cas <= 1'h1;
 		if (clk_sel[1])
 			dram_cas <= 1'h0;
-		
+
 		if (clk_sel[4] & (cpu_dram_access | dram_refresh_slot))
 			dram_cas <= 1'h1;
 		if (clk_sel[5] & clk_sel[6] & dram_cpu_access_16)
@@ -2719,39 +2749,38 @@ module gf1
 			dram_cas <= 1'h1;
 		if (clk_sel[9])
 			dram_cas <= 1'h0;
-		
+
 		if (clk_sel[2] & chan_c0)
 			dram_cas_refresh <= 1'h1;
 		if (clk_sel[9])
 			dram_cas_refresh <= 1'h0;
-		
+
 		if (clk_sel[1] | clk_sel[9])
 			dram_latch_hi <= 1'h1;
 		if (clk_sel[6] | clk_sel[14])
 			dram_latch_hi <= 1'h0;
-			
+
 		if (clk_sel[6] | clk_sel[14])
 			dram_latch_lo <= 1'h1;
 		if (clk_sel[4] | clk_sel[12])
 			dram_latch_lo <= 1'h0;
-		
+
 		if (dram_latch_hi)
 			dram_in[15:8] <= DRAM_DATA_i;
 		if (dram_latch_lo)
 			dram_in[7:0] <= DRAM_DATA_i;
 		if (~dram_in_16)
 			dram_in[7:0] <= 8'h0;
-		
+
 		// synth
-		
+
 		if (clk1)
 			mul_val_a_l <= dram_in;
 		if (clk3)
 			mul_val_a <= mul_val_a_l;
 		else if (clk1)
 			mul_val_a <= mul_interp;
-		
-		
+
 		w2056 = clk2 & chan_c0_l;
 		w33 = ~chan_c0_l & clk2;
 		w2036 = chan_c0 & clk1;
@@ -2764,7 +2793,7 @@ module gf1
 		w2416 = chan_c0_l & clk4;
 		w1924 = chan_c0_l & clk3;
 		w1923 = ~chan_c0_l & clk3;
-		
+
 		if (w1924)
 		begin
 			atten_l[0] <= ramp_cur;
@@ -2775,8 +2804,7 @@ module gf1
 			atten_l[1] <= atten_l[0];
 			pan_l[1] <= pan_l[0];
 		end
-			
-		
+
 		if (w33)
 			interp_in <= wave_cur[8:1];
 		if (w2036)
@@ -2788,22 +2816,22 @@ module gf1
 			mul_val_b <= interp_in_mul;
 		else if (clk1)
 			mul_val_b <= { 1'h1, atten[7:0] };
-		
+
 		mul_result <= mul_val_a_s * mul_val_b_s;
-		
+
 		if (w2415)
 			mul_mem[0] <= mul_result[23:8];
 		if (w2416)
 			mul_mem[1] <= mul_result[23:8];
-		
+
 		if (w2036)
 			mul_interp <= mul_mem[0] + mul_mem[1];
-		
+
 		if (w2415)
 			w2048 <= 1'h1;
 		else if (w2416)
 			w2048 <= 1'h0;
-		
+
 		case (pan)
 			4'h0: pan_atten = 9'h000;
 			4'h1: pan_atten = 9'h1fe;
@@ -2822,22 +2850,22 @@ module gf1
 			4'he: pan_atten = 9'h1c0;
 			default: pan_atten = 9'h0;
 		endcase
-		
+
 		if (clk2)
 		begin
 			val_shifted <= {{15{mul_result[24]}}, mul_result[24:9]} >> (~atten[11:8]);
 		end
-		
+
 		if (w2416)
 			accum_l[0] <= accum_sum;
 		if (w2415)
 			accum_l[1] <= accum_sum;
-		
+
 		if (w33)
 			w2360 <= 1'h0;
 		else if (chan_cnt_res)
 			w2360 <= 1'h1;
-		
+
 		if (w2416)
 		begin
 			w2360_l[0] <= w2360;
@@ -2848,17 +2876,17 @@ module gf1
 			w2360_l[1] <= w2360_l[0];
 			w2360_l[3] <= w2360_l[2];
 		end
-		
+
 		if (w2360_l[3])
 			accum_add <= 21'h0;
 		else if (w2056)
 			accum_add <= accum_l[0];
 		else if (w33)
 			accum_add <= accum_l[1];
-		
+
 		if (w2360_l[1] & w2415)
 			accum_mem <= accum_clip;
-		
+
 		if (CLK)
 		begin
 			dac_clk1_l[0] = clk1;
@@ -2873,17 +2901,17 @@ module gf1
 			dac_clk3_l[1] = dac_clk3_l[0];
 			dac_clk4_l[1] = dac_clk4_l[0];
 		end
-		
+
 		w2003 = (clk1 & dac_clk1_l[1])
 			| (clk2 & dac_clk2_l[1])
 			| (clk3 & dac_clk3_l[1])
 			| (clk4 & dac_clk4_l[1]);
-		
+
 		if (clk1)
 			w262 = 1'h1;
 		else if (chan_cnt_res)
 			w262 = 1'h0;
-		
+
 		if (clk3)
 		begin
 			w262_l[0] <= w262;
@@ -2891,8 +2919,7 @@ module gf1
 		end
 		if (clk1)
 			w262_l[1] <= w262_l[0];
-		
-		
+
 		if (~w2003)
 		begin
 			dac_counter[0] = dac_counter[1] + 6'h1;
@@ -2903,18 +2930,18 @@ module gf1
 			dac_counter[1] = dac_counter[0];
 			w2008[1] = w2008[0];
 		end
-		
+
 		if (~dac_enable | w2008[1])
 			w2007 = 1'h1;
 		else if (~w262_l[2])
 			w2007 = 1'h0;
-		
+
 		if (w2007)
 		begin
 			dac_counter[0] = 0;
 			dac_counter[1] = 0;
 		end
-	
+
 		w2042 = ~(dac_counter[1][1] & dac_counter[1][2]);
 		w2045 = ~(~dac_counter[1][0] & ~dac_counter[1][1]);
 		w2043 = ~(w2042 & dac_counter[1][5] & ~dac_counter[1][4] & ~dac_counter[1][3]);
@@ -2930,19 +2957,19 @@ module gf1
 		w2038 = ~(~w2003 & (w1999 | w2022 | w2031));
 		w2055 = ~(~dac_counter[1][5] | dac_counter[1][4] | ~dac_counter[1][3] | ~dac_counter[1][0]);
 		w2040 = ~(dac_counter[1][5] | ~dac_counter[1][4] | dac_counter[1][3] | ~dac_counter[1][0]);
-		
+
 		if (w2038)
 			accum_shifter[0] <= w1998 ? { accum_shifter[1][14:0], 1'h0 } : (w2059 ? accum_mem : accum_clip);
 		else
 			accum_shifter[1] <= accum_shifter[0];
-		
+
 		DAC_CLK <= w2003;
-		
+
 		if (w2021 & ~w2003)
 			DAC_LR <= 1'h1;
 		if (~dac_enable | (w2020 & ~w2003))
 			DAC_LR <= 1'h0;
-		
+
 		if ((w2020 | w2021) & ~w2003)
 			DAC_LR2 <= 1'h1;
 		if (~dac_enable | ((w2055 | w2040) & ~w2003))
@@ -2953,9 +2980,9 @@ module gf1
 	initial begin
 		chan_active_cnt = 0;
 		reset_reg_not = 0;
-		
+
 		voice_ram[0] <= 148'h0;
-		
+
 		clk_sel[0] = 0;
 		clk_sel[1] = 0;
 		clk_sel[2] = 0;
@@ -2973,9 +3000,9 @@ module gf1
 		clk_sel[14] = 0;
 		clk_sel[15] = 0;
 		clk_sel[16] = 0;
-		
+
 		chan_cnt_res_l = 0;
-		
+
 		chan_cnt[0] = 0;
 		chan_cnt[1] = 0;
 	end
