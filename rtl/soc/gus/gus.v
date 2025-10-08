@@ -20,7 +20,21 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 	output        irq_11,
 
 	output [15:0] audio_l,
-	output [15:0] audio_r
+	output [15:0] audio_r,
+
+	input         pll_locked,
+	output        SDRAM_CLK,
+	output        SDRAM_CKE,
+	output [12:0] SDRAM_A,
+	output  [1:0] SDRAM_BA,
+	inout  [15:0] SDRAM_DQ,
+	output        SDRAM_DQML,
+	output        SDRAM_DQMH,
+	output        SDRAM_nCS,
+	output        SDRAM_nCAS,
+	output        SDRAM_nRAS,
+	output        SDRAM_nWE
+
 );
 
 	reg [16:0] gf1_clk;
@@ -37,13 +51,11 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 
 	wire [8:0] DADDR;
 	wire [7:0] DRAM_o;
-	wire [63:0] DRAM_o2 = { DRAM_o, DRAM_o, DRAM_o, DRAM_o, DRAM_o, DRAM_o, DRAM_o, DRAM_o };
-	wire [63:0] DRAM_i2;
-	reg [7:0] DRAM_i;
-	reg [7:0] DRAM_i_l;
-	reg [7:0] byteena;
+	wire [7:0] DRAM_i;
 	reg DWE;
+	reg dram_access;
 	wire DRAM_WE;
+	wire dram_refresh;
 
 	reg IOW;
 	reg IOR;
@@ -56,44 +68,33 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 	wire CAS2;
 	wire CAS3;
 
-	always @(*)
-	begin
-		case(DADDR_l1[2:0])
-			3'h0: DRAM_i <= DRAM_i2[7:0];
-			3'h1: DRAM_i <= DRAM_i2[15:8];
-			3'h2: DRAM_i <= DRAM_i2[23:16];
-			3'h3: DRAM_i <= DRAM_i2[31:24];
-			3'h4: DRAM_i <= DRAM_i2[39:32];
-			3'h5: DRAM_i <= DRAM_i2[47:40];
-			3'h6: DRAM_i <= DRAM_i2[55:48];
-			3'h7: DRAM_i <= DRAM_i2[63:56];
-		endcase
-		case(DADDR_l1[2:0])
-			3'h0: byteena <= 8'b00000001;
-			3'h1: byteena <= 8'b00000010;
-			3'h2: byteena <= 8'b00000100;
-			3'h3: byteena <= 8'b00001000;
-			3'h4: byteena <= 8'b00010000;
-			3'h5: byteena <= 8'b00100000;
-			3'h6: byteena <= 8'b01000000;
-			3'h7: byteena <= 8'b10000000;
-		endcase
-	end
-
 	wire CASA0 = CAS0 & RAS;
 	wire CASA1 = CAS1 & RAS;
 	wire CASA2 = CAS2 & RAS;
 	wire CASA3 = CAS3 & RAS;
 
-	bram ram
-		(
-		.address({DADDR_l2, DADDR_l1[8:3]}),
-		.clock(clk),
-		.data(DRAM_o2),
-		.wren(DWE),
-		.byteena(byteena),
-		.q(DRAM_i2)
-		);
+sdram sdram (
+	.init             (~pll_locked),
+	.clk              (clk),
+	.addr             ({DADDR_l2, DADDR_l1}),
+	.dout             (DRAM_i),
+	.din              (DRAM_o),
+	.we               (dram_access &  DWE),
+	.rd               (dram_access & ~DWE),
+//	.ready            (),
+
+	.SDRAM_DQ         (SDRAM_DQ),
+	.SDRAM_A          (SDRAM_A),
+	.SDRAM_DQML       (SDRAM_DQML),
+	.SDRAM_DQMH       (SDRAM_DQMH),
+	.SDRAM_BA         (SDRAM_BA),
+	.SDRAM_nCS        (SDRAM_nCS),
+	.SDRAM_nWE        (SDRAM_nWE),
+	.SDRAM_nRAS       (SDRAM_nRAS),
+	.SDRAM_nCAS       (SDRAM_nCAS),
+	.SDRAM_CLK        (SDRAM_CLK),
+	.SDRAM_CKE        (SDRAM_CKE)
+);
 
 	reg o_RAS;
 	reg o_CAS0;
@@ -202,6 +203,7 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 		.DRAM_DATA_i   (DRAM_i),
 		.DRAM_DATA_o   (DRAM_o),
 		.DRAM_WE       (DRAM_WE),
+		.dram_refresh  (dram_refresh),
 		.DAC_CLK       (dac_clk),
 		.DAC_DATA      (dac_data),
 		.DAC_LR        (dac_lr),
@@ -222,11 +224,13 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 				DADDR_l1 <= DADDR;
 				DADDR_l2[10:9] <= { CASA2 | CASA3, CASA1 | CASA3 };
 				DWE <= DRAM_WE;
+				dram_access <= 1;
 			end
 		end
 		if ((~CASA0 & o_CAS0) | (~CASA1 & o_CAS1))
 		begin
 			DWE <= 0;
+			dram_access <= 0;
 		end
 
 		o_CAS0 <= CASA0;

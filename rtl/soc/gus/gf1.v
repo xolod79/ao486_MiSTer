@@ -33,6 +33,7 @@ module gf1
 	output DRAM_CAS1,
 	output DRAM_CAS2,
 	output DRAM_CAS3,
+	output dram_refresh,
 	output DAC_DATA,
 	output reg DAC_CLK,
 	output reg DAC_LR,
@@ -537,6 +538,7 @@ module gf1
 	reg cls9_dma_read;
 	
 	reg dram_refresh_slot;
+	assign dram_refresh = dram_refresh_slot;
 	
 	reg [2:0] dram_dma_clk_cnt[0:1];
 	

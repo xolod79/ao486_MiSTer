@@ -846,7 +846,20 @@ system system
 	.DDRAM_BURSTCNT       (DDRAM_BURSTCNT),
 	.DDRAM_BUSY           (DDRAM_BUSY),
 	.DDRAM_RD             (DDRAM_RD),
-	.DDRAM_WE             (DDRAM_WE)
+	.DDRAM_WE             (DDRAM_WE),
+
+	.pll_locked           (pll_locked),
+	.SDRAM_DQ             (SDRAM_DQ),
+	.SDRAM_A              (SDRAM_A),
+	.SDRAM_DQML           (SDRAM_DQML),
+	.SDRAM_DQMH           (SDRAM_DQMH),
+	.SDRAM_BA             (SDRAM_BA),
+	.SDRAM_nCS            (SDRAM_nCS),
+	.SDRAM_nWE            (SDRAM_nWE),
+	.SDRAM_nRAS           (SDRAM_nRAS),
+	.SDRAM_nCAS           (SDRAM_nCAS),
+	.SDRAM_CLK            (SDRAM_CLK),
+	.SDRAM_CKE            (SDRAM_CKE)
 );
 
 wire [7:0] syscfg;

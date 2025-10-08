@@ -119,7 +119,20 @@ module system
 	output        DDRAM_RD,
 	output [63:0] DDRAM_DIN,
 	output  [7:0] DDRAM_BE,
-	output        DDRAM_WE
+	output        DDRAM_WE,
+
+	input         pll_locked,
+	output        SDRAM_CLK,
+	output        SDRAM_CKE,
+	output [12:0] SDRAM_A,
+	output  [1:0] SDRAM_BA,
+	inout  [15:0] SDRAM_DQ,
+	output        SDRAM_DQML,
+	output        SDRAM_DQMH,
+	output        SDRAM_nCS,
+	output        SDRAM_nCAS,
+	output        SDRAM_nRAS,
+	output        SDRAM_nWE
 );
 
 wire        a20_enable;
@@ -720,7 +733,21 @@ gus gus
 	.audio_l           (sample_gus_l),
 	.audio_r           (sample_gus_r),
 
-	.irq_11            (irq_11)
+	.irq_11            (irq_11),
+
+	.pll_locked        (pll_locked),
+	.SDRAM_DQ          (SDRAM_DQ),
+	.SDRAM_A           (SDRAM_A),
+	.SDRAM_DQML        (SDRAM_DQML),
+	.SDRAM_DQMH        (SDRAM_DQMH),
+	.SDRAM_BA          (SDRAM_BA),
+	.SDRAM_nCS         (SDRAM_nCS),
+	.SDRAM_nWE         (SDRAM_nWE),
+	.SDRAM_nRAS        (SDRAM_nRAS),
+	.SDRAM_nCAS        (SDRAM_nCAS),
+	.SDRAM_CLK         (SDRAM_CLK),
+	.SDRAM_CKE         (SDRAM_CKE)
+
 );
 
 uart uart1
