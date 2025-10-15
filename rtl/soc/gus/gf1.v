@@ -1,43 +1,41 @@
 module gf1
 	(
-	input MCLK,
-	input CLK, // div 2 (9878400 hz),
-	input IOW,
-	input IOR,
-	input CS1, // GF1
-	input CS2, // MIDI
-	input DACK1, // DRAM
-	input DACK2, // RECORD
-	input RESET,
-	output WAIT,
-	output DRQ1,
-	output DRQ2,
-	output IRQ1,
-	output IRQ2,
-	output IRQ3,
-	input DMA_TC,
-	input [15:0] DATA_i,
+	input         MCLK,
+	input         CLK,   // div 2 (9878400 hz),
+	input         IOW,
+	input         IOR,
+	input         CS1,   // GF1
+	input         CS2,   // MIDI
+	input         DACK1, // DRAM
+	input         DACK2, // RECORD
+	input         RESET,
+	output        WAIT,
+	output        DRQ1,
+	output        IRQ1,
+	output        IRQ2,
+	input         DMA_TC,
+	input  [15:0] DATA_i,
 	output [15:0] DATA_o,
-	input [15:0] dma_readdata,
-	output reg [15:0] dma_writedata,
-	input IO16,
-	input [3:0] ADDRESS,
-	output BUSA_LOW,
-	output BUSA_HIGH,
-	input [7:0] DRAM_DATA_i,
-	output [7:0] DRAM_DATA_o,
-	output reg DRAM_WE,
-	output reg DRAM_RAS,
-	output [8:0] DRAM_ADDR,
-	output DRAM_CAS0,
-	output DRAM_CAS1,
-	output DRAM_CAS2,
-	output DRAM_CAS3,
-	output dram_refresh,
-	output DAC_DATA,
-	output reg DAC_CLK,
-	output reg DAC_LR,
-	output reg DAC_LR2
+	input  [15:0] dma_readdata,
+	output [15:0] dma_writedata,
+	input         IO16,
+	input   [3:0] ADDRESS,
+	output        BUSA_LOW,
+	output        BUSA_HIGH,
+	input   [7:0] DRAM_DATA_i,
+	output  [7:0] DRAM_DATA_o,
+	output reg    DRAM_WE,
+	output [8:0]  DRAM_ADDR,
+	output        DRAM_CAS0,
+	output        DRAM_CAS1,
+	output        DRAM_CAS2,
+	output        DRAM_CAS3,
+	output reg    dram_ras,
+	output        dram_refresh,
+	output        DAC_DATA,
+	output reg    DAC_CLK,
+	output reg    DAC_LR,
+	output reg    DAC_LR2
 	);
 
 	reg clk_sel[0:16];
@@ -359,15 +357,11 @@ module gf1
 	wire rec_dma_chan_width = 0; // stub
 	wire midi_rx_irq = 0;
 	wire midi_tx_irq = 0;
-	
-	assign DRQ2 = 0;
-	assign IRQ3 = 0;
-	
+
 	//
 	
-	
 	wire dack_comb = DACK1 | DACK2;
-	
+
 	wire cpu_write = IOW & ~dack_comb;
 	wire cpu_read = IOR & ~dack_comb;
 	wire cpu_addr_0 = ADDRESS == 4'h0;
@@ -411,7 +405,7 @@ module gf1
 	
 	wire cpu_write_4 = cpu_write & CS1 & cpu_addr_4;
 	wire cpu_write_5 = cpu_write & CS1 & cpu_addr_5;
-	
+
 	wire glob_addr_41 = glob_reg_l2[6:0] == 7'h41;
 	wire glob_addr_42 = glob_reg_l2[6:0] == 7'h42;
 	wire glob_addr_43 = glob_reg_l2[6:0] == 7'h43;
@@ -425,7 +419,9 @@ module gf1
 	wire glob_addr_4c = glob_reg_l2[6:0] == 7'h4c;
 	
 	reg [7:0] glob_read_mux;
-	
+
+	assign dma_writedata = dram_dma_rd_latch;
+
 	reg dram_dma_invert_msb;
 	reg dram_dma_data_size;
 	reg dram_dma_irq_en_l;
@@ -557,16 +553,15 @@ module gf1
 	
 	assign DRQ1 = (~dram_dma_tc & dram_dma_req_wr2) | dram_dma_req_rd;
 	
-	reg [15:0] dram_dma_in_data;
 	wire [15:0] dram_dma_in_data_sign;
 	
 	reg dram_dma_hi_lo_byte_sel[0:1];
 	
-	assign dram_dma_in_data_sign = { dram_dma_in_data[15] ^ (dram_dma_chan_width & dram_dma_invert_msb),
-		dram_dma_in_data[14:8], 
-		dram_dma_in_data[7] ^ (dram_dma_invert_msb &
+	assign dram_dma_in_data_sign = { dma_readdata[15] ^ (dram_dma_chan_width & dram_dma_invert_msb),
+		dma_readdata[14:8], 
+		dma_readdata[7] ^ (dram_dma_invert_msb &
 		(~dram_dma_data_size | (~dram_dma_hi_lo_byte_sel[1] & dram_dma_data_size & ~dram_dma_chan_width))),
-		dram_dma_in_data[6:0] };
+		dma_readdata[6:0] };
 	
 	reg dram_dma_write_state1;
 	reg dram_dma_write_state2;
@@ -623,9 +618,9 @@ module gf1
 	
 	reg dram_addr_cw_sel;
 	
-	wire [19:0] dram_cpu_addr = dram_dma_access ? dram_dma_address[1] : dram_peek_address;
+	wire   [19:0] dram_cpu_addr = dram_dma_access ? dram_dma_address[1] : dram_peek_address;
 	wire [19:0] dram_addr_linear = dram_addr_cw_sel ? dram_cpu_addr : wave_addr_l[2][28:9];
-	
+
 	wire [10:0] dram_addr1 = dram_hi_sel ?
 		{ dram_addr_linear[16], dram_addr_linear[15], dram_addr_linear[15], dram_addr_linear[14:7] } :
 		{ dram_addr_linear[17], dram_addr_linear[16], dram_addr_linear[7:0], dram_subaddr };
@@ -672,8 +667,11 @@ module gf1
 	wire blaster_io_irq = blaster_io_dsp_req | blaster_io_dsp_reset_req | adlib_io_req;
 	wire adlib_irq = timer1_expire | timer2_expire;
 	
-	wire wait_voice_write = glob_data_exec & glob_data_wr2;
-	wire wait_voice_read = (glob_data_rd3 & cpu_read & CS1 & (cpu_addr_4 | cpu_addr_5)) | (glob_data_wr2 & cpu_write3);
+//	wire wait_voice_write = glob_data_exec & glob_data_wr2;
+	wire wait_voice_write = glob_data_exec | glob_data_wr1 | glob_data_wr2;
+
+//	wire wait_voice_read = (glob_data_rd3 & cpu_read & CS1 & (cpu_addr_4 | cpu_addr_5)) | (glob_data_wr2 & cpu_write3);
+	wire wait_voice_read = (glob_data_rd3 & CS1 & (cpu_addr_4 | cpu_addr_5)) | (glob_data_wr2 & cpu_write3);
 	
 	//assign WAIT = dram_pp_wait | wait_voice_read | wait_voice_write;
 	assign WAIT = dram_pp_wait_d | wait_voice_read | wait_voice_write;
@@ -909,7 +907,7 @@ module gf1
 	end
 
 	dram_pp_state_d <= dram_pp_state;
-	// !!!
+// !!!
 
 		// IO
 		
@@ -2239,7 +2237,7 @@ module gf1
 		end
 		else if (glob_addr_45)
 		begin
-			glob_read_mux = { 
+			glob_read_mux = {
 				2'h0,
 				timer_ctrl_b5,
 				timer_ctrl_b4,
@@ -2263,9 +2261,13 @@ module gf1
 				};
 		end
 		
-		if (w434)
-			glob_data_read <= glob_data_bus;
-		
+		if (w434) begin
+//			glob_data_read <= glob_data_bus;
+			if (cpu_addr_4)
+				cpu_bus[7:0] <= glob_data_bus[7:0];
+			if (cpu_addr_5)
+				cpu_bus[7:0] <= glob_data_bus[15:8];
+		end
 		
 		// cpu data bus
 		
@@ -2280,12 +2282,14 @@ module gf1
 					cpu_bus[7:0] <= 8'h0; // stub
 				if (glob_reg_l2[7:6] == 2'h2) // voice registers
 				begin
-					if (cpu_addr_4 | cpu_addr_5)
+/*					if (cpu_addr_4 | cpu_addr_5)
 						cpu_bus[15:8] <= glob_data_read[15:8];
 					if (cpu_addr_5 & ~IO16)
 						cpu_bus[7:0] <= glob_data_read[15:8];
 					if (cpu_addr_4 | (cpu_addr_5 & IO16))
-						cpu_bus[7:0] <= glob_data_read[7:0];
+						cpu_bus[7:0] <= glob_data_read[7:0]; */
+					if (cpu_addr_5)
+						cpu_bus[7:0] <= glob_data_bus[15:8];
 				end
 				if (glob_reg_l2[6] & (cpu_addr_4 | cpu_addr_5))
 					cpu_bus <= glob_read_mux;
@@ -2309,12 +2313,12 @@ module gf1
 				if (cpu_addr_E) // blaster status
 					cpu_bus[7:0] <= reg_2XE;
 			end
-			if (CS2) // MIDI
+			if (CS1) // MIDI
 			begin
-				if (cpu_addr_0)
-					cpu_bus[7:0] <= 8'h0; // stub
-				if (cpu_addr_1)
-					cpu_bus[7:0] <= 8'h0; // stub
+				if (cpu_addr_0)    // MIDI UART 6850 Control reg
+					cpu_bus[7:0] <= 8'h2; // stub
+//				if (cpu_addr_1)
+//					cpu_bus[7:0] <= 8'h0; // stub
 			end
 		end
 		
@@ -2537,7 +2541,8 @@ module gf1
 		else if (clk_sel[9])
 			dram_refresh_slot = 1'h0;
 		
-		if ((IOR | IOW) & DACK1 & dram_dma_en)
+//		if ((IOR | IOW) & DACK1 & dram_dma_en)
+		if (DACK1 & dram_dma_en)
 			dram_dma_tc_l <= DMA_TC;
 		else
 			dram_dma_tc <= dram_dma_tc_l;
@@ -2582,8 +2587,8 @@ module gf1
 			dram_dma_clk_cnt[1] <= 0;
 		end
 
-		if (DACK1 & IOW)
-			dram_dma_in_data <= dma_readdata;
+//		if (DACK1 & IOW)
+//			dram_dma_in_data <= dma_readdata;
 
 		if (~dram_dma_write_state1)
 			dram_dma_hi_lo_byte_sel[0] <= ~dram_dma_hi_lo_byte_sel[1];
@@ -2595,25 +2600,29 @@ module gf1
 			dram_dma_hi_lo_byte_sel[1] <= 1'h0;
 		end
 
-		if (IOW & DACK1)
+//		if (IOW & DACK1)
+		if (DACK1 & ~dram_dma_dir)
 			dram_dma_write_state1 <= 1'h1;
 		else if (dram_dma_dir | ~dram_dma_en | dram_dma_write_state2)
 			dram_dma_write_state1 <= 1'h0;
 
-		if (dram_dma_write_state1 & ~IOW)
+//		if (dram_dma_write_state1 & ~IOW)
+		if (dram_dma_write_state1)
 			dram_dma_write_state2 <= 1'h1;
 		else if (cls9_dma_write | ~dram_dma_en)
 			dram_dma_write_state2 <= 1'h0;
 
-		if (IOR & DACK1 & dram_dma_en & dram_dma_dir)
-			dma_writedata <= dram_dma_rd_latch;
+//		if (IOR & DACK1 & dram_dma_en & dram_dma_dir)
+//			dma_writedata <= dram_dma_rd_latch;
 
-		if (IOR & DACK1)
+//		if (IOR & DACK1)
+		if (DACK1 & dram_dma_dir)
 			dram_dma_read_state1 <= 1'h1;
 		else if (~dram_dma_en | dram_dma_read_state2)
 			dram_dma_read_state1 <= 1'h0;
 
-		if (dram_dma_en | (IOR & ~dram_dma_read_state1))
+//		if (dram_dma_en | (IOR & ~dram_dma_read_state1))
+		if (dram_dma_en | ~dram_dma_read_state1)
 			dram_dma_read_state2 <= 1'h1;
 		else if (cls9_dma_read)
 			dram_dma_read_state2 <= 1'h0;
@@ -2724,15 +2733,15 @@ module gf1
 			dram_dma_rd_latch <= dram_bus;
 
 		if (clk_sel[10])
-			DRAM_RAS <= 1'h1;
+			dram_ras <= 1'h1;
 		if (clk_sel[16])
-			DRAM_RAS <= 1'h0;
+			dram_ras <= 1'h0;
 		if (clk_sel[2] & cpu_dram_access)
-			DRAM_RAS <= 1'h1;
+			dram_ras <= 1'h1;
 		if (clk_sel[5] & dram_refresh_slot)
-			DRAM_RAS <= 1'h1;
+			dram_ras <= 1'h1;
 		if (clk_sel[7] & clk_sel[8])
-			DRAM_RAS <= 1'h0;
+			dram_ras <= 1'h0;
 
 		if (clk_sel[11] & clk_sel[12])
 			dram_cas <= 1'h1;

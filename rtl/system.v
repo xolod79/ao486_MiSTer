@@ -733,7 +733,7 @@ gus gus
 	.audio_l           (sample_gus_l),
 	.audio_r           (sample_gus_r),
 
-	.irq_11            (irq_11),
+	.irq               (irq_11),
 
 	.pll_locked        (pll_locked),
 	.SDRAM_DQ          (SDRAM_DQ),

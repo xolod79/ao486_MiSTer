@@ -17,7 +17,7 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 	input  [15:0] dma_readdata,
 	output [15:0] dma_writedata,
 
-	output        irq_11,
+	output        irq,
 
 	output [15:0] audio_l,
 	output [15:0] audio_r,
@@ -52,26 +52,21 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 	wire [8:0] DADDR;
 	wire [7:0] DRAM_o;
 	wire [7:0] DRAM_i;
-	reg DWE;
-	reg dram_access;
-	wire DRAM_WE;
+	reg  dwe;
+	reg  dram_access;
+	wire dram_we;
 	wire dram_refresh;
 
-	reg IOW;
-	reg IOR;
-	reg IO16;
-	reg DACK1;
+	wire ras;
+	wire cas0;
+	wire cas1;
+	wire cas2;
+	wire cas3;
 
-	wire RAS;
-	wire CAS0;
-	wire CAS1;
-	wire CAS2;
-	wire CAS3;
-
-	wire CASA0 = CAS0 & RAS;
-	wire CASA1 = CAS1 & RAS;
-	wire CASA2 = CAS2 & RAS;
-	wire CASA3 = CAS3 & RAS;
+	wire casa0 = cas0 & ras;
+	wire casa1 = cas1 & ras;
+	wire casa2 = cas2 & ras;
+	wire casa3 = cas3 & ras;
 
 sdram sdram (
 	.init             (~pll_locked),
@@ -79,8 +74,8 @@ sdram sdram (
 	.addr             ({DADDR_l2, DADDR_l1}),
 	.dout             (DRAM_i),
 	.din              (DRAM_o),
-	.we               (dram_access &  DWE),
-	.rd               (dram_access & ~DWE),
+	.we               (dram_access &  dwe),
+	.rd               (dram_access & ~dwe),
 //	.ready            (),
 
 	.SDRAM_DQ         (SDRAM_DQ),
@@ -96,11 +91,11 @@ sdram sdram (
 	.SDRAM_CKE        (SDRAM_CKE)
 );
 
-	reg o_RAS;
-	reg o_CAS0;
-	reg o_CAS1;
-	reg o_CAS2;
-	reg o_CAS3;
+	reg o_ras;
+	reg o_cas0;
+	reg o_cas1;
+	reg o_cas2;
+	reg o_cas3;
 
 	reg [15:0] dac_shifter;
 	reg [15:0] dac_left;
@@ -121,20 +116,10 @@ sdram sdram (
 	reg io_read;
 	reg io_dmawrite;
 	reg io_dmaread;
-//	reg [7:0] dma_req;
-	wire DREQ;
-	reg o_DREQ;
+	wire dreq;
 
-	reg irq_sleep;
-	reg [7:0] irq_state;
-	wire IRQ1;
-	wire IRQ2;
-	assign irq_11 = IRQ1 | IRQ2;
-	reg o_IRQ;
-
-//	wire [15:0] gusbase = 16'h240;
-
-//	reg [15:0] io_address;
+	wire irq1;
+	wire irq2;
 
 	wire gf1_wait;
 	reg [1:0] read_wait;
@@ -147,7 +132,8 @@ sdram sdram (
 	wire      write_cont = (~write_d & gf1_write) | (|write_wait);
 	assign    io_wait = gf1_wait | read_cont | write_cont;
 
-/*	wire isgf1addr = (io_address[15:4] == gusbase[15:4]
+/*	wire [15:0] gusbase = 16'h240;
+	wire isgf1addr = (io_address[15:4] == gusbase[15:4]
 		& (io_address[3:0] == 4'h6 | io_address[3:0] == 4'h8 | io_address[3:0] == 4'h9
 		| io_address[3:0] == 4'ha | io_address[3:0] == 4'hc | io_address[3:0] == 4'he)) |
 		(io_address[15:4] == (gusbase[15:4] | 16'h10)
@@ -161,19 +147,18 @@ sdram sdram (
 		| io_address[3:0] == 4'ha | io_address[3:0] == 4'hc | io_address[3:0] == 4'he)) |
 		(io_address8                  // 340
 		& (io_address[3:0] == 4'h2 | io_address[3:0] == 4'h3 | io_address[3:0] == 4'h4
-		| io_address[3:0] == 4'h5 | io_address[3:0] == 4'h7));
+		| io_address[3:0] == 4'h5 | io_address[3:0] == 4'h7)); */
 	wire ismixeraddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'h0);
-	wire isdmairqaddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'hb); */
+//	wire isdmairqaddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'hb);
 
-//	reg dmairq_enable;
-//	wire DREQ2 = dmairq_enable & DREQ;
-//	wire IRQE = dmairq_enable & IRQ;
+	reg dmairq_regsel;
+	reg dmairq_enable;
+	assign dma_req = dmairq_enable & dreq;
+	assign irq = dmairq_enable & (irq1 | irq2);
 
 //	reg [3:0] irqsel;
 //	reg [3:0] dmasel;
 
-//	wire goodaddr = isgf1addr | ismixeraddr | isdmairqaddr;
-	
 	gf1 gf1(
 		.MCLK          (clk),
 		.CLK           (gf1_clk2),
@@ -187,22 +172,22 @@ sdram sdram (
 		.IO16          (0),
 		.CS1           (gus_cs),
 		.CS2           (0),
-		.DRQ1          (dma_req),
+		.DRQ1          (dreq),
 		.DACK1         (dma_ack),
 		.DACK2         (0),
-		.IRQ1          (IRQ1),
-		.IRQ2          (IRQ2),
+		.IRQ1          (irq1),
+		.IRQ2          (irq2),
 		.RESET         (reset),
 		.DMA_TC        (dma_tc),
-		.DRAM_CAS0     (CAS0),
-		.DRAM_CAS1     (CAS1),
-		.DRAM_CAS2     (CAS2),
-		.DRAM_CAS3     (CAS3),
-		.DRAM_RAS      (RAS),
+		.DRAM_CAS0     (cas0),
+		.DRAM_CAS1     (cas1),
+		.DRAM_CAS2     (cas2),
+		.DRAM_CAS3     (cas3),
+		.dram_ras      (ras),
 		.DRAM_ADDR     (DADDR),
 		.DRAM_DATA_i   (DRAM_i),
 		.DRAM_DATA_o   (DRAM_o),
-		.DRAM_WE       (DRAM_WE),
+		.DRAM_WE       (dram_we),
 		.dram_refresh  (dram_refresh),
 		.DAC_CLK       (dac_clk),
 		.DAC_DATA      (dac_data),
@@ -213,31 +198,31 @@ sdram sdram (
 	always @(posedge clk)
 	begin
 		// dram
-		if (RAS & ~o_RAS)
+		if (ras & ~o_ras)
 		begin
 			DADDR_l2[8:0] <= DADDR;
 		end
-		if ((CASA0 & ~o_CAS0) | (CASA1 & ~o_CAS1)/* | (CASA2 & ~o_CAS2) | (CASA3 & ~o_CAS3)*/)
+		if ((casa0 & ~o_cas0) | (casa1 & ~o_cas1) | (casa2 & ~o_cas2) | (casa3 & ~o_cas3))
 		begin
-			if (o_RAS)
+			if (o_ras)
 			begin
 				DADDR_l1 <= DADDR;
-				DADDR_l2[10:9] <= { CASA2 | CASA3, CASA1 | CASA3 };
-				DWE <= DRAM_WE;
+				DADDR_l2[10:9] <= { casa2 | casa3, casa1 | casa3 };
+				dwe <= dram_we;
 				dram_access <= 1;
 			end
 		end
-		if ((~CASA0 & o_CAS0) | (~CASA1 & o_CAS1))
+		if ((~casa0 & o_cas0) | (~casa1 & o_cas1) | (~casa2 & o_cas2) | (~casa3 & o_cas3))
 		begin
-			DWE <= 0;
+			dwe <= 0;
 			dram_access <= 0;
 		end
 
-		o_CAS0 <= CASA0;
-		o_CAS1 <= CASA1;
-		o_CAS2 <= CASA2;
-		o_CAS3 <= CASA3;
-		o_RAS <= RAS;
+		o_cas0 <= casa0;
+		o_cas1 <= casa1;
+		o_cas2 <= casa2;
+		o_cas3 <= casa3;
+		o_ras <= ras;
 
 		// dac
 
@@ -258,6 +243,11 @@ sdram sdram (
 		write_d <= gf1_write;
 		read_wait  <= { read_wait[0],  (~read_d & gf1_read)   ? 1'b1 : 1'b0 };
 		write_wait <= { write_wait[0], (~write_d & gf1_write) ? 1'b1 : 1'b0 };
+
+		if (ismixeraddr & write) begin
+			dmairq_regsel <= writedata[6];
+			dmairq_enable <= writedata[3];
+		end
 
 	end
 
