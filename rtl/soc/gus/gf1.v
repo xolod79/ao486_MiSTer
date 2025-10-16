@@ -522,7 +522,6 @@ module gf1
 	
 	reg adlib_reg_sel_4[0:1];
 	
-	reg dram_dma_tc_l;
 	reg dram_dma_tc;
 	reg dram_dma_irq_pending;
 	
@@ -2541,15 +2540,17 @@ module gf1
 		else if (clk_sel[9])
 			dram_refresh_slot = 1'h0;
 		
-//		if ((IOR | IOW) & DACK1 & dram_dma_en)
-		if (DACK1 & dram_dma_en)
+/*		if ((IOR | IOW) & DACK1 & dram_dma_en)
 			dram_dma_tc_l <= DMA_TC;
 		else
-			dram_dma_tc <= dram_dma_tc_l;
+			dram_dma_tc <= dram_dma_tc_l; */
+		
+		if (DMA_TC & dram_dma_en)
+			dram_dma_tc <= 1'h1;
 		
 		if (reset_reg | dram_dma_irq_ack)
 		begin
-			dram_dma_tc_l <= 1'h0;
+//			dram_dma_tc_l <= 1'h0;
 			dram_dma_tc <= 1'h0;
 		end
 		
