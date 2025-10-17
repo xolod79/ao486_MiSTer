@@ -46,36 +46,23 @@ module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
 		gf1_clk <= gf1_clk + 14386;   // = (9878400 * 2 *65536) / 90000000
 	end
 
-	reg [8:0] DADDR_l1;
-	reg [10:0] DADDR_l2;
-
-	wire [8:0] DADDR;
-	wire [7:0] DRAM_o;
-	wire [7:0] DRAM_i;
-	reg  dwe;
-	reg  dram_access;
+	wire [19:0] dram_addr;
+	wire [15:0] DRAM_o;
+	wire [15:0] DRAM_i;
+	wire word;
+	wire dram_access;
 	wire dram_we;
 	wire dram_refresh;
-
-	wire ras;
-	wire cas0;
-	wire cas1;
-	wire cas2;
-	wire cas3;
-
-	wire casa0 = cas0 & ras;
-	wire casa1 = cas1 & ras;
-	wire casa2 = cas2 & ras;
-	wire casa3 = cas3 & ras;
 
 sdram sdram (
 	.init             (~pll_locked),
 	.clk              (clk),
-	.addr             ({DADDR_l2, DADDR_l1}),
+	.addr             (dram_addr),
 	.dout             (DRAM_i),
 	.din              (DRAM_o),
-	.we               (dram_access &  dwe),
-	.rd               (dram_access & ~dwe),
+	.we               (dram_access &  dram_we),
+	.rd               (dram_access & ~dram_we),
+	.word             (word),
 //	.ready            (),
 
 	.SDRAM_DQ         (SDRAM_DQ),
@@ -91,12 +78,6 @@ sdram sdram (
 	.SDRAM_CKE        (SDRAM_CKE)
 );
 
-	reg o_ras;
-	reg o_cas0;
-	reg o_cas1;
-	reg o_cas2;
-	reg o_cas3;
-
 	reg [15:0] dac_shifter;
 	reg [15:0] dac_left;
 	reg [15:0] dac_right;
@@ -109,13 +90,6 @@ sdram sdram (
 	assign audio_l = dac_left;
 	assign audio_r = dac_right;
 
-	reg [7:0] lpc_cnt;
-	reg lpc_state;
-	reg [3:0] lpc_out;
-	reg io_write;
-	reg io_read;
-	reg io_dmawrite;
-	reg io_dmaread;
 	wire dreq;
 
 	wire irq1;
@@ -171,23 +145,18 @@ sdram sdram (
 		.dma_readdata  (dma_readdata),
 		.IO16          (0),
 		.CS1           (gus_cs),
-		.CS2           (0),
 		.DRQ1          (dreq),
 		.DACK1         (dma_ack),
-		.DACK2         (0),
 		.IRQ1          (irq1),
 		.IRQ2          (irq2),
 		.RESET         (reset),
 		.DMA_TC        (dma_tc),
-		.DRAM_CAS0     (cas0),
-		.DRAM_CAS1     (cas1),
-		.DRAM_CAS2     (cas2),
-		.DRAM_CAS3     (cas3),
-		.dram_ras      (ras),
-		.DRAM_ADDR     (DADDR),
+		.dram_access   (dram_access),
+		.dram_word     (word),
+		.dram_addr     (dram_addr),
 		.DRAM_DATA_i   (DRAM_i),
 		.DRAM_DATA_o   (DRAM_o),
-		.DRAM_WE       (dram_we),
+		.dram_we       (dram_we),
 		.dram_refresh  (dram_refresh),
 		.DAC_CLK       (dac_clk),
 		.DAC_DATA      (dac_data),
@@ -197,33 +166,6 @@ sdram sdram (
 
 	always @(posedge clk)
 	begin
-		// dram
-		if (ras & ~o_ras)
-		begin
-			DADDR_l2[8:0] <= DADDR;
-		end
-		if ((casa0 & ~o_cas0) | (casa1 & ~o_cas1) | (casa2 & ~o_cas2) | (casa3 & ~o_cas3))
-		begin
-			if (o_ras)
-			begin
-				DADDR_l1 <= DADDR;
-				DADDR_l2[10:9] <= { casa2 | casa3, casa1 | casa3 };
-				dwe <= dram_we;
-				dram_access <= 1;
-			end
-		end
-		if ((~casa0 & o_cas0) | (~casa1 & o_cas1) | (~casa2 & o_cas2) | (~casa3 & o_cas3))
-		begin
-			dwe <= 0;
-			dram_access <= 0;
-		end
-
-		o_cas0 <= casa0;
-		o_cas1 <= casa1;
-		o_cas2 <= casa2;
-		o_cas3 <= casa3;
-		o_ras <= ras;
-
 		// dac
 
 		if (dac_clk & ~o_dac_clk)

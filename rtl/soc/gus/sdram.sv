@@ -45,11 +45,12 @@ module sdram
    output            SDRAM_CLK,
                                   //
    input      [24:0] addr,        // 25 bit address for 8bit mode. addr[0] = 0 for 16bit mode for correct operations.
-   output      [7:0] dout,        // data output to cpu
-   input       [7:0] din,         // data input from cpu
+   output     [15:0] dout,        // data output to cpu
+   input      [15:0] din,         // data input from cpu
    input             we,          // cpu requests write
    input             rd,          // cpu requests read
    input             refresh,     // refresh requests
+   input             word,        // 16 bit write
    output reg        ready        // dout is valid. Ready to accept new read/write.
 );
 
@@ -85,9 +86,10 @@ wire [2:0] CMD_LOAD_MODE       = 3'b000;
 reg [13:0] refresh_count = startup_refresh_max - sdram_startup_cycles;
 reg  [2:0] command;
 reg [24:0] save_addr;
+reg        save_word;
 
 reg [15:0] data;
-assign dout = save_addr[0] ? data[15:8] : data[7:0];
+assign dout = data;
 
 typedef enum
 {
@@ -101,7 +103,7 @@ always @(posedge clk) begin
 	reg old_we, old_rd;
 	reg [CAS_LATENCY:0] data_ready_delay;
 
-	reg  [7:0] new_data;
+	reg [15:0] new_data;
 	reg        new_we;
 	reg        new_rd;
 	reg        save_we = 1;
@@ -168,6 +170,7 @@ always @(posedge clk) begin
 				new_rd   <= 0;
 				save_addr<= addr;
 				save_we  <= new_we;
+				save_word<= word;
 				state    <= STATE_OPEN_1;
 				command  <= CMD_ACTIVE;
 				SDRAM_A  <= addr[13:1];
@@ -178,10 +181,10 @@ always @(posedge clk) begin
 		STATE_OPEN_1: state <= STATE_OPEN_2;
 
 		STATE_OPEN_2: begin
-			SDRAM_A     <= {save_we & ~save_addr[0], save_we & save_addr[0], 2'b10, save_addr[22:14]};
+			SDRAM_A     <= { save_word ? 2'b00 : {save_we & ~save_addr[0], save_we & save_addr[0]}, 2'b10, save_addr[22:14]};
 			if(save_we) begin
 				command  <= CMD_WRITE;
-				SDRAM_DQ <= {new_data[7:0], new_data[7:0]};
+				SDRAM_DQ <= new_data;
 				ready    <= 1;
 				state    <= STATE_IDLE_2;
 			end
