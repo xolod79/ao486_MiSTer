@@ -1,4 +1,4 @@
-module gus    // ULTRASND IO = 240, IRQ = 11, DMA = 7
+module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 (
 	input         clk, // LPC Clock
 	input         reset,

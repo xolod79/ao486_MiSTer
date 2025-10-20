@@ -174,7 +174,13 @@ wire        interrupt_done;
 wire        interrupt_do;
 wire  [7:0] interrupt_vector;
 reg  [15:0] interrupt;
-wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_11, irq_12, irq_14, irq_15;
+wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_6, irq_8, irq_9, irq_12, irq_14, irq_15;
+
+wire        sb_irq;
+wire        sb_irq_5_en;
+wire        sb_irq_7_en;
+wire        sb_irq_10_en;
+wire        gus_irq;
 
 wire        cpu_io_read_do;
 wire [15:0] cpu_io_read_address;
@@ -705,9 +711,10 @@ sound sound
 	.fm_mode           (sound_fm_mode),
 	.cms_en            (sound_cms_en),
 
-	.irq_5             (irq_5),
-	.irq_7             (irq_7),
-	.irq_10            (irq_10)
+	.irq               (sb_irq),
+	.irq_5_en          (sb_irq_5_en),
+	.irq_7_en          (sb_irq_7_en),
+	.irq_10_en         (sb_irq_10_en)
 );
 
 gus gus
@@ -733,7 +740,7 @@ gus gus
 	.audio_l           (sample_gus_l),
 	.audio_r           (sample_gus_r),
 
-	.irq               (irq_11),
+	.irq               (gus_irq),
 
 	.pll_locked        (pll_locked),
 	.SDRAM_DQ          (SDRAM_DQ),
@@ -895,13 +902,12 @@ always @* begin
 	interrupt[1]  = irq_1;
 	interrupt[3]  = irq_3;
 	interrupt[4]  = irq_4;
-	interrupt[5]  = irq_5;
+	interrupt[5]  = (sb_irq & sb_irq_5_en) | (gus_irq & sb_irq_7_en);
 	interrupt[6]  = irq_6;
-	interrupt[7]  = irq_7;
+	interrupt[7]  = (sb_irq & sb_irq_7_en) | (gus_irq & sb_irq_5_en);
 	interrupt[8]  = irq_8;
 	interrupt[9]  = irq_9 | irq_2;
-	interrupt[10] = irq_10;
-	interrupt[11] = irq_11;
+	interrupt[10] = (sb_irq & sb_irq_10_en);
 	interrupt[12] = irq_12;
 	interrupt[14] = irq_14;
 	interrupt[15] = irq_15;

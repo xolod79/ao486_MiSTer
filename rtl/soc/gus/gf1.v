@@ -357,16 +357,18 @@ module gf1
 	
 	// stubs
 	
-	wire rec_dma_chan_width = 0; // stub
+//	wire rec_dma_chan_width = 0; // stub
 	wire midi_rx_irq = 0;
 	wire midi_tx_irq = 0;
 
 	//
 	
-	wire dack_comb = DACK1 | DACK2;
+//	wire dack_comb = DACK1 | DACK2;
 
-	wire cpu_write = IOW & ~dack_comb;
-	wire cpu_read = IOR & ~dack_comb;
+//	wire cpu_write = IOW & ~dack_comb;
+//	wire cpu_read = IOR & ~dack_comb;
+	wire cpu_write = IOW;
+	wire cpu_read = IOR;
 	wire cpu_addr_0 = ADDRESS == 4'h0;
 	wire cpu_addr_1 = ADDRESS == 4'h1;
 	wire cpu_addr_2 = ADDRESS == 4'h2;
@@ -382,15 +384,16 @@ module gf1
 	wire cpu_addr_D = ADDRESS == 4'hD;
 	wire cpu_addr_E = ADDRESS == 4'hE;
 	
-	wire cpu_input = IOW & (dack_comb |
+//	wire cpu_input = IOW & (dack_comb |
+	wire cpu_input = IOW & (
 		(CS1 & (cpu_addr_1 | cpu_addr_2 | cpu_addr_3 | cpu_addr_4 | cpu_addr_5 | cpu_addr_6 | cpu_addr_7
 			| cpu_addr_8 | cpu_addr_9 | cpu_addr_A | cpu_addr_C | cpu_addr_D | cpu_addr_E)) |
 			(CS2 & (cpu_addr_0 | cpu_addr_1)));
 	
-	wire cpu_output = IOR & (dack_comb |
+/*	wire cpu_output = IOR & (dack_comb |
 		(CS1 & (cpu_addr_1 | cpu_addr_2 | cpu_addr_3 | cpu_addr_4 | cpu_addr_5 | cpu_addr_6 | cpu_addr_7
 			| cpu_addr_8 | cpu_addr_9 | cpu_addr_A | cpu_addr_C | cpu_addr_E)) |
-			(CS2 & (cpu_addr_0 | cpu_addr_1)));
+			(CS2 & (cpu_addr_0 | cpu_addr_1))); */
 	
 	assign DATA_o = cpu_bus;
 	
@@ -625,10 +628,10 @@ module gf1
 	reg [15:0] dram_in;
 	
 	reg dram_subaddr;
-	reg dram_hi_sel;
+//	reg dram_hi_sel;
 	
 //	assign DRAM_DATA_o = ((dram_access_16 & ~dram_subaddr) | ~dram_access_16) ? dram_bus[7:0] : dram_bus[15:8];
-	assign DRAM_DATA_o =  dram_access_16 ? {dram_bus[7:0], dram_bus[15:8]} : {dram_bus[7:0], dram_bus[7:0]} ;
+	assign DRAM_DATA_o =  dram_access_16 ? dram_bus[15:0] : {dram_bus[7:0], dram_bus[7:0]};
 	
 	reg dram_addr_cw_sel;
 	
@@ -2606,10 +2609,10 @@ module gf1
 		
 		if (~dram_dma_en | cls9_dma_write)
 			dram_dma_req_wr1 <= 1'h1;
-		else if (dram_dma_req_wr2)
+		else if (dram_dma_req_wr2 | DACK1 | ~dram_dma_en)
 			dram_dma_req_wr1 <= 1'h0;
 		
-		if (dram_dma_tick & ~dram_dma_dir & dram_dma_req_wr1)
+		if (dram_dma_tick & ~dram_dma_dir & dram_dma_req_wr1 & ~DACK1)
 			dram_dma_req_wr2 <= 1'h1;
 		else if (DACK1 | ~dram_dma_en)
 			dram_dma_req_wr2 <= 1'h0;
@@ -2645,7 +2648,7 @@ module gf1
 			dram_dma_write_state1 <= 1'h0;
 
 //		if (dram_dma_write_state1 & ~IOW)
-		if (dram_dma_write_state1)
+		if (dram_dma_write_state1 & ~DACK1)
 			dram_dma_write_state2 <= 1'h1;
 		else if (cls9_dma_write | ~dram_dma_en)
 			dram_dma_write_state2 <= 1'h0;
@@ -2745,14 +2748,14 @@ module gf1
 		else if (clk_sel[9])
 			dram_addr_cw_sel <= 1'h0;
 
-		if (clk_sel[8] & clk_sel[9])
+/*		if (clk_sel[8] & clk_sel[9])
 			dram_hi_sel <= 1'h1;
 		if (clk_sel[11])
 			dram_hi_sel <= 1'h0;
 		if (clk_sel[16] & clk_sel[1])
 			dram_hi_sel <= 1'h1;
 		if (clk_sel[3])
-			dram_hi_sel <= 1'h0;
+			dram_hi_sel <= 1'h0; */
 
 		if (~dram_io_dir)
 		begin
@@ -2823,7 +2826,7 @@ module gf1
 
 		if (clk_sel[8] | clk_sel[0]) begin
 			dram_in[15:8] <= ( ~dram_in_16 & ~dram_addr_linear[0] ) ? DRAM_DATA_i[7:0] : DRAM_DATA_i[15:8];
-			dram_in[7:0]  <= dram_in_16 ? DRAM_DATA_i[15:8] : 8'h0;
+			dram_in[7:0]  <= dram_in_16 ? DRAM_DATA_i[7:0] : 8'h0;
 		end
 
 		// synth
