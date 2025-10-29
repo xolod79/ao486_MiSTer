@@ -544,6 +544,7 @@ module gf1
 	
 	reg cls9_dma_write;
 	reg cls9_dma_read;
+	reg clk_sel9_d;
 	
 	reg dram_refresh_slot;
 	assign dram_refresh = dram_refresh_slot;
@@ -622,22 +623,21 @@ module gf1
 	reg dram_in_16;
 	
 	assign dram_word = dram_cpu_access_16;
-	assign dram_access = (clk_sel[4] & cpu_dram_access) | clk_sel[11] ; // CPU and Voice dram access
+//	assign dram_access = (clk_sel[4] & cpu_dram_access) | clk_sel[11] ; // CPU and Voice dram access
+	assign dram_access = (clk_sel[3] & cpu_dram_access) | clk_sel[10] ; // CPU and Voice dram access
 	
 	reg [15:0] dram_bus;
-	reg [15:0] dram_in;
+	wire [15:0] dram_in;
+	assign dram_in[15:8] = ( ~dram_in_16 & ~dram_addr_linear[0] ) ? DRAM_DATA_i[7:0] : DRAM_DATA_i[15:8];
+	assign dram_in[7:0]  = dram_in_16 ? DRAM_DATA_i[7:0] : 8'h0;
 	
-	reg dram_subaddr;
-//	reg dram_hi_sel;
-	
-//	assign DRAM_DATA_o = ((dram_access_16 & ~dram_subaddr) | ~dram_access_16) ? dram_bus[7:0] : dram_bus[15:8];
 	assign DRAM_DATA_o =  dram_access_16 ? dram_bus[15:0] : {dram_bus[7:0], dram_bus[7:0]};
 	
 	reg dram_addr_cw_sel;
 	
 	wire   [19:0] dram_cpu_addr = dram_dma_access ? dram_dma_address[1] : dram_peek_address;
 	assign dram_addr = { dram_addr_linear[19:18], dram_access_16 ?
-                                                {dram_addr_linear[15:7], dram_addr_linear[16], dram_addr_linear[6:0], dram_subaddr} :
+                                                {dram_addr_linear[15:7], dram_addr_linear[16], dram_addr_linear[6:0], 1'b0} :
                                                 {dram_addr_linear[16:8], dram_addr_linear[17], dram_addr_linear[7:0]} };
 	wire [19:0] dram_addr_linear = dram_addr_cw_sel ? dram_cpu_addr : wave_addr_l[2][28:9];
 
@@ -927,6 +927,8 @@ module gf1
 	end
 
 	dram_pp_state_d <= dram_pp_state;
+
+	clk_sel9_d <= clk_sel[9];
 // !!!
 
 		// IO
@@ -2599,7 +2601,7 @@ module gf1
 		else if (~dram_dma_tc & ~dram_dma_irq_ack)
 			dram_dma_irq_pending <= 1'h0;
 		
-		cls9_dma_write = clk_sel[9] & ~dram_dma_dir & dram_dma_access;
+		cls9_dma_write = clk_sel[9] & ~clk_sel9_d & ~dram_dma_dir & dram_dma_access;
 		cls9_dma_read = clk_sel[9] & dram_dma_dir & dram_dma_access;
 		
 		if (cls9_dma_read)
@@ -2730,18 +2732,14 @@ module gf1
 		if (~dram_voice_access_16 & clk_sel[9])
 			dram_access_16 <= 1'h0;
 
-		if (clk_sel[2] | clk_sel[10])
+//		if (clk_sel[2] | clk_sel[10])
+		if (clk_sel[2] | clk_sel[9])
 			dram_in_16 <= dram_access_16;
 
 		if (clk_sel[2] & dram_io_dir)
 			dram_we <= 1'h1;
 		if (clk_sel[9])
 			dram_we <= 1'h0;
-
-		if (clk_sel[6] | clk_sel[14])
-			dram_subaddr <= 1'h1;
-		if (clk_sel[9] | clk_sel[1])
-			dram_subaddr <= 1'h0;
 
 		if (clk_sel[1])
 			dram_addr_cw_sel <= 1'h1;
@@ -2824,10 +2822,10 @@ module gf1
 		if (~dram_in_16)
 			dram_in[7:0] <= 8'h0;*/
 
-		if (clk_sel[8] | clk_sel[0]) begin
+/*		if (clk_sel[8] | clk_sel[16]) begin
 			dram_in[15:8] <= ( ~dram_in_16 & ~dram_addr_linear[0] ) ? DRAM_DATA_i[7:0] : DRAM_DATA_i[15:8];
 			dram_in[7:0]  <= dram_in_16 ? DRAM_DATA_i[7:0] : 8'h0;
-		end
+		end */
 
 		// synth
 

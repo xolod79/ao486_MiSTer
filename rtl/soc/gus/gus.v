@@ -11,6 +11,8 @@ module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 	input         read,
 	output        io_wait,
 
+	input  [27:0] clock_rate,
+
 	output        dma_req,
 	input         dma_ack,
 	input         dma_tc,
@@ -43,7 +45,16 @@ module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 
 	always @(posedge clk)
 	begin
-		gf1_clk <= gf1_clk + 14386;   // = (9878400 * 2 *65536) / 90000000
+		if (clock_rate == 100_000_000)
+					gf1_clk <= gf1_clk + 12948;   // = (9_878_400 * 2 *65536) / 100_000_000
+		else if (clock_rate == 56_250_000)
+					gf1_clk <= gf1_clk + 23018;   // = (9_878_400 * 2 *65536) / 56_250_000
+		else if (clock_rate == 30_000_000)
+					gf1_clk <= gf1_clk + 43159;   // = (9_878_400 * 2 *65536) / 30_000_000
+		else if (clock_rate == 15_000_000)
+					gf1_clk <= gf1_clk + 86319;   // = (9_878_400 * 2 *65536) / 15_000_000  !!! Not correct !!
+		else
+					gf1_clk <= gf1_clk + 14386;   // = (9_878_400 * 2 *65536) / 90_000_000
 	end
 
 	wire [19:0] dram_addr;

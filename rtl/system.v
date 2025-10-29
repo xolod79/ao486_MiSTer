@@ -722,6 +722,8 @@ gus gus
 	.clk               (clk_sys),
 	.reset             (reset),
 
+	.clock_rate        (clock_rate),
+
 	.io_address8       (iobus_address[8]),
 	.io_address        (iobus_address[3:0]),
 	.writedata         (iobus_writedata[7:0]),
