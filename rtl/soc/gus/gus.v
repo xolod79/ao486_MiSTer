@@ -1,6 +1,6 @@
 module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 (
-	input         clk, // LPC Clock
+	input         clk, // System Clock
 	input         reset,
 	input         io_address8,
 	input   [3:0] io_address,
@@ -36,14 +36,13 @@ module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
 	output        SDRAM_nWE
-
 );
 
-	reg [16:0] gf1_clk;
+reg  [16:0] gf1_clk;
 
-	wire gf1_clk2 = gf1_clk[16];
+wire gf1_clk2 = gf1_clk[16];
 
-	always @(posedge clk)
+always @(posedge clk)
 	begin
 		if (clock_rate == 100_000_000)
 					gf1_clk <= gf1_clk + 12948;   // = (9_878_400 * 2 *65536) / 100_000_000
@@ -57,13 +56,13 @@ module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 					gf1_clk <= gf1_clk + 14386;   // = (9_878_400 * 2 *65536) / 90_000_000
 	end
 
-	wire [19:0] dram_addr;
-	wire [15:0] DRAM_o;
-	wire [15:0] DRAM_i;
-	wire word;
-	wire dram_access;
-	wire dram_we;
-	wire dram_refresh;
+wire [19:0] dram_addr;
+wire [15:0] DRAM_o;
+wire [15:0] DRAM_i;
+wire word;
+wire dram_access;
+wire dram_we;
+wire dram_refresh;
 
 sdram sdram (
 	.init             (~pll_locked),
@@ -89,33 +88,19 @@ sdram sdram (
 	.SDRAM_CKE        (SDRAM_CKE)
 );
 
-	reg [15:0] dac_shifter;
-	reg [15:0] dac_left;
-	reg [15:0] dac_right;
-	reg o_dac_clk;
-	wire dac_clk;
-	wire dac_data;
-	wire dac_lr;
-	reg o_dac_lr;
-
-	assign audio_l = dac_left;
-	assign audio_r = dac_right;
-
-	wire dreq;
-
-	wire irq1;
-	wire irq2;
-
-	wire gf1_wait;
-	reg [1:0] read_wait;
-	reg [1:0] write_wait;
-	reg       read_d;
-	reg       write_d;
-	wire      gf1_read  = read  & gus_cs;
-	wire      gf1_write = write & gus_cs;
-	wire      read_cont =  (~read_d  & gf1_read)  | (|read_wait);
-	wire      write_cont = (~write_d & gf1_write) | (|write_wait);
-	assign    io_wait = gf1_wait | read_cont | write_cont;
+wire       dreq;
+wire       irq1;
+wire       irq2;
+wire       gf1_wait;
+reg  [1:0] read_wait;
+reg  [1:0] write_wait;
+reg        read_d;
+reg        write_d;
+wire       gf1_read  = read  & gus_cs;
+wire       gf1_write = write & gus_cs;
+wire       read_cont =  (~read_d  & gf1_read)  | (|read_wait);
+wire       write_cont = (~write_d & gf1_write) | (|write_wait);
+assign     io_wait = gf1_wait | read_cont | write_cont;
 
 /*	wire [15:0] gusbase = 16'h240;
 	wire isgf1addr = (io_address[15:4] == gusbase[15:4]
@@ -136,62 +121,45 @@ sdram sdram (
 	wire ismixeraddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'h0);
 //	wire isdmairqaddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'hb);
 
-	reg dmairq_regsel;
-	reg dmairq_enable;
-	assign dma_req = dmairq_enable & dreq;
-	assign irq = dmairq_enable & (irq1 | irq2);
+reg  dmairq_regsel;
+reg  dmairq_enable;
+assign dma_req = dmairq_enable & dreq;
+assign irq = dmairq_enable & (irq1 | irq2);
 
-//	reg [3:0] irqsel;
-//	reg [3:0] dmasel;
+//	reg  [3:0] irqsel;
+//	reg  [3:0] dmasel;
 
-	gf1 gf1(
-		.MCLK          (clk),
-		.CLK           (gf1_clk2),
-		.IOW           (write_cont),
-		.IOR           (read_cont),
-		.ADDRESS       (io_address[3:0]),
-		.DATA_i        ({8'd0, writedata}),
-		.DATA_o        (readdata),
-		.dma_writedata (dma_writedata),
-		.dma_readdata  (dma_readdata),
-		.IO16          (0),
-		.CS1           (gus_cs),
-		.DRQ1          (dreq),
-		.DACK1         (dma_ack),
-		.IRQ1          (irq1),
-		.IRQ2          (irq2),
-		.RESET         (reset),
-		.DMA_TC        (dma_tc),
-		.dram_access   (dram_access),
-		.dram_word     (word),
-		.dram_addr     (dram_addr),
-		.DRAM_DATA_i   (DRAM_i),
-		.DRAM_DATA_o   (DRAM_o),
-		.dram_we       (dram_we),
-		.dram_refresh  (dram_refresh),
-		.DAC_CLK       (dac_clk),
-		.DAC_DATA      (dac_data),
-		.DAC_LR        (dac_lr),
-		.WAIT          (gf1_wait)
-		);
+gf1 gf1 (
+	.MCLK          (clk),
+	.CLK           (gf1_clk2),
+	.IOW           (write_cont),
+	.IOR           (read_cont),
+	.CS1           (gus_cs),
+	.ADDRESS       (io_address[3:0]),
+	.DATA_i        ({8'd0, writedata}),
+	.DATA_o        (readdata),
+	.dma_writedata (dma_writedata),
+	.dma_readdata  (dma_readdata),
+	.DRQ1          (dreq),
+	.DACK1         (dma_ack),
+	.IRQ1          (irq1),
+	.IRQ2          (irq2),
+	.RESET         (reset),
+	.WAIT          (gf1_wait),
+	.DMA_TC        (dma_tc),
+	.dram_access   (dram_access),
+	.dram_word     (word),
+	.dram_addr     (dram_addr),
+	.DRAM_DATA_i   (DRAM_i),
+	.DRAM_DATA_o   (DRAM_o),
+	.dram_we       (dram_we),
+	.dram_refresh  (dram_refresh),
+	.audio_l       (audio_l),
+	.audio_r       (audio_r)
+);
 
-	always @(posedge clk)
+always @(posedge clk)
 	begin
-		// dac
-
-		if (dac_clk & ~o_dac_clk)
-		begin
-			dac_shifter <= { dac_shifter[14:0], dac_data };
-			if (o_dac_lr & ~dac_lr)
-				dac_left <= dac_shifter;
-			else if (~o_dac_lr & dac_lr)
-				dac_right <= dac_shifter;
-			
-			o_dac_lr <= dac_lr;
-		end
-
-		o_dac_clk <= dac_clk;
-
 		read_d <= gf1_read;
 		write_d <= gf1_write;
 		read_wait  <= { read_wait[0],  (~read_d & gf1_read)   ? 1'b1 : 1'b0 };
