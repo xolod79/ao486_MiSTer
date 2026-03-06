@@ -63,7 +63,7 @@ module gf1
 	wire chan_active_match = chan_cmp_l == chan_active_cnt_l;
 	wire chan_irq_match = chan_cmp_l2 == chan_irq_l;
 	
-	reg [147:0] voice_ram[0:31];
+	wire [147:0] ram_right_q;
 	reg [147:0] ram_right_bus;
 	reg [147:0] ram_left_bus;
 	reg [147:0] ram_output_latch;
@@ -946,17 +946,17 @@ module gf1
 		else if (w434)
 		begin
 			if (voice_reg_E)
-				glob_data_bus[12:8] <= glob_data_bus[12:8] & chan_active_cnt;
+				glob_data_bus[12:8] <= chan_active_cnt;
 			else if (voice_reg_F)
 			begin
-				glob_data_bus[15:8] <= glob_data_bus[15:8] & { ~wave_irq_set_l, ~ramp_irq_set_l, 1'h1, chan_irq };
+				glob_data_bus[15:8] <= { ~wave_irq_set_l, ~ramp_irq_set_l, 1'h1, chan_irq };
 				voice_irq_read_l <= 1'h1;
 			end
 			else if (voice_reg_0)
-				glob_data_bus[15:8] <= glob_data_bus[15:8] & ram_right_bus[147:140];
+				glob_data_bus[15:8] <= ram_right_bus[147:140];
 			else if (voice_reg_1)
 			begin
-				glob_data_bus[15:1] <= glob_data_bus[15:1] & {
+				glob_data_bus[15:1] <= {
 					ram_right_bus[94],
 					ram_right_bus[90],
 					ram_right_bus[86],
@@ -975,7 +975,7 @@ module gf1
 			end
 			else if (voice_reg_2)
 			begin
-				glob_data_bus[12:0] <= glob_data_bus[12:0] & {
+				glob_data_bus[12:0] <= {
 					ram_right_bus[138],
 					ram_right_bus[135],
 					ram_right_bus[132],
@@ -992,7 +992,7 @@ module gf1
 			end
 			else if (voice_reg_3)
 			begin
-				glob_data_bus[15:5] <= glob_data_bus[15:5] & {
+				glob_data_bus[15:5] <= {
 					ram_right_bus[99],
 					ram_right_bus[96],
 					ram_right_bus[92],
@@ -1007,7 +1007,7 @@ module gf1
 			end
 			else if (voice_reg_4)
 			begin
-				glob_data_bus[12:0] <= glob_data_bus[12:0] & {
+				glob_data_bus[12:0] <= {
 					ram_right_bus[137],
 					ram_right_bus[134],
 					ram_right_bus[131],
@@ -1024,7 +1024,7 @@ module gf1
 			end
 			else if (voice_reg_5)
 			begin
-				glob_data_bus[15:5] <= glob_data_bus[15:5] & {
+				glob_data_bus[15:5] <= {
 					ram_right_bus[98],
 					ram_right_bus[95],
 					ram_right_bus[91],
@@ -1039,7 +1039,7 @@ module gf1
 			end
 			else if (voice_reg_6)
 			begin
-				glob_data_bus[15:8] <= glob_data_bus[15:8] & {
+				glob_data_bus[15:8] <= {
 					ram_right_bus[43],
 					ram_right_bus[42],
 					ram_right_bus[12],
@@ -1051,7 +1051,7 @@ module gf1
 			end
 			else if (voice_reg_7)
 			begin
-				glob_data_bus[15:8] <= glob_data_bus[15:8] & {
+				glob_data_bus[15:8] <= {
 					ram_right_bus[32],
 					ram_right_bus[29],
 					ram_right_bus[26],
@@ -1063,7 +1063,7 @@ module gf1
 			end
 			else if (voice_reg_8)
 			begin
-				glob_data_bus[15:8] <= glob_data_bus[15:8] & {
+				glob_data_bus[15:8] <= {
 					ram_right_bus[31],
 					ram_right_bus[28],
 					ram_right_bus[25],
@@ -1075,7 +1075,7 @@ module gf1
 			end
 			else if (voice_reg_9)
 			begin
-				glob_data_bus[15:4] <= glob_data_bus[15:4] & {
+				glob_data_bus[15:4] <= {
 					ram_right_bus[33],
 					ram_right_bus[30],
 					ram_right_bus[27],
@@ -1091,7 +1091,7 @@ module gf1
 			end
 			else if (voice_reg_A)
 			begin
-				glob_data_bus[12:0] <= glob_data_bus[12:0] & {
+				glob_data_bus[12:0] <= {
 					ram_right_bus[139],
 					ram_right_bus[136],
 					ram_right_bus[133],
@@ -1108,7 +1108,7 @@ module gf1
 			end
 			else if (voice_reg_B)
 			begin
-				glob_data_bus <= glob_data_bus & {
+				glob_data_bus <= {
 					ram_right_bus[100],
 					ram_right_bus[97],
 					ram_right_bus[93],
@@ -1128,7 +1128,7 @@ module gf1
 			end
 			else if (voice_reg_C)
 			begin
-				glob_data_bus[11:8] <= glob_data_bus[11:8] & {
+				glob_data_bus[11:8] <= {
 					ram_right_bus[47],
 					ram_right_bus[46],
 					ram_right_bus[45],
@@ -1136,7 +1136,7 @@ module gf1
 			end
 			else if (voice_reg_D)
 			begin
-				glob_data_bus[15:8] <= glob_data_bus[15:8] & {
+				glob_data_bus[15:8] <= {
 					ram_right_bus[41],
 					ram_right_bus[40],
 					ram_right_bus[39],
@@ -1173,11 +1173,9 @@ module gf1
 			ram_addr_l = chan_sel;
 		
 		if (voice_ram_read)
-			ram_right_bus <= voice_ram[ram_addr_l];
+			ram_right_bus <= ram_right_q;
 		else if ((clk_sel[4] & ~clk1) | clk_sel[12])
 			ram_right_bus <= ~148'h0;
-		if (voice_ram_update)
-			voice_ram[ram_addr_l] <= ram_left_bus;
 		
 		//if (voice_rw_pending)
 		//	w1823 = clk3;
@@ -2824,8 +2822,6 @@ module gf1
 		chan_active_cnt = 0;
 		reset_reg_not = 0;
 
-		voice_ram[0] <= 148'h0;
-
 		clk_sel[0] = 0;
 		clk_sel[1] = 0;
 		clk_sel[2] = 0;
@@ -2849,5 +2845,21 @@ module gf1
 		chan_cnt[0] = 0;
 		chan_cnt[1] = 0;
 	end
+
+spram #(5,128) voice_bram1 (
+    .clock     (MCLK),
+    .address   (ram_addr_l),
+    .data      (ram_left_bus[127:0]),
+    .wren      (voice_ram_update),
+    .q         (ram_right_q[127:0])
+);
+
+spram #(5,20) voice_bram2 (
+    .clock     (MCLK),
+    .address   (ram_addr_l),
+    .data      (ram_left_bus[147:128]),
+    .wren      (voice_ram_update),
+    .q         (ram_right_q[147:128])
+);
 
 endmodule
