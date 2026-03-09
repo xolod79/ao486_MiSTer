@@ -2194,6 +2194,10 @@ module gf1
 			begin
 				if (cpu_addr_1) // joystick
 					cpu_bus[7:0] <= 8'h0; // stub
+				if (cpu_addr_2) // Channel
+					cpu_bus[7:0] <= dest_channel;
+				if (cpu_addr_3) // Glob reg
+					cpu_bus[7:0] <= glob_reg;
 				if (glob_reg_l2[7:6] == 2'h2) // voice registers
 				begin
 /*					if (cpu_addr_4 | cpu_addr_5)
