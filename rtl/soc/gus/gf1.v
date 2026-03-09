@@ -1174,8 +1174,6 @@ module gf1
 		
 		if (voice_ram_read)
 			ram_right_bus <= ram_right_q;
-		else if ((clk_sel[4] & ~clk1) | clk_sel[12])
-			ram_right_bus <= ~148'h0;
 		
 		//if (voice_rw_pending)
 		//	w1823 = clk3;
@@ -1678,10 +1676,6 @@ module gf1
 			ram_left_bus[3] <= ram_input_latch[3];
 			ram_left_bus[1] <= ram_input_latch[1];
 		end
-		
-		if (clk_sel[8] | clk_sel[16])
-			ram_left_bus <= 148'h0;
-		
 		
 		// wave
 		
