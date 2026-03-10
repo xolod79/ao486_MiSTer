@@ -63,8 +63,7 @@ module gf1
 	wire chan_active_match = chan_cmp_l == chan_active_cnt_l;
 	wire chan_irq_match = chan_cmp_l2 == chan_irq_l;
 	
-	wire [147:0] ram_right_q;
-	reg [147:0] ram_right_bus;
+	wire [147:0] ram_right_bus;
 	reg [147:0] ram_left_bus;
 	reg [147:0] ram_output_latch;
 	reg [147:0] ram_input_latch;
@@ -1148,7 +1147,6 @@ module gf1
 			voice_reg_sel <= glob_reg_l2[5:0];
 		
 		
-			
 		//if (~chan_c0)
 		//	voice_ram_update_pipeline = clk2;
 		voice_ram_update_pipeline = chan_c0 & clk2;
@@ -1167,9 +1165,6 @@ module gf1
 		
 		if (voice_ram_read)
 			ram_addr_l = chan_sel;
-		
-		if (voice_ram_read)
-			ram_right_bus <= ram_right_q;
 		
 		//if (voice_rw_pending)
 		//	w1823 = clk3;
@@ -2845,7 +2840,7 @@ spram #(5,128) voice_bram1 (
     .address   (ram_addr_l),
     .data      (ram_left_bus[127:0]),
     .wren      (voice_ram_update),
-    .q         (ram_right_q[127:0])
+    .q         (ram_right_bus[127:0])
 );
 
 spram #(5,20) voice_bram2 (
@@ -2853,7 +2848,7 @@ spram #(5,20) voice_bram2 (
     .address   (ram_addr_l),
     .data      (ram_left_bus[147:128]),
     .wren      (voice_ram_update),
-    .q         (ram_right_q[147:128])
+    .q         (ram_right_bus[147:128])
 );
 
 endmodule
