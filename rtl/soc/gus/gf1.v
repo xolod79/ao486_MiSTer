@@ -935,11 +935,7 @@ module gf1
 		if (clk3)
 			voice_irq_read_l <= 1'h0;
 		
-		if (ram_strobe & clk2 & voice_rw_pending)
-		begin
-			glob_data_bus <= 16'hffff; // precharge
-		end
-		else if (ram_wr_strobe)
+		if (ram_wr_strobe)
 		begin
 			glob_data_bus <= glob_data_l2;
 		end
