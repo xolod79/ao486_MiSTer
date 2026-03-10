@@ -14,7 +14,7 @@ module gf1
 	output        IRQ2,
 	input         DMA_TC,
 	input  [15:0] DATA_i,
-	output [15:0] DATA_o,
+	output  [7:0] DATA_o,
 	input  [15:0] dma_readdata,
 	output [15:0] dma_writedata,
 	input         IO16,
@@ -372,12 +372,26 @@ module gf1
 			| cpu_addr_8 | cpu_addr_9 | cpu_addr_A | cpu_addr_C | cpu_addr_D | cpu_addr_E)) |
 			(CS2 & (cpu_addr_0 | cpu_addr_1)));
 	
-/*	wire cpu_output = IOR & (dack_comb |
-		(CS1 & (cpu_addr_1 | cpu_addr_2 | cpu_addr_3 | cpu_addr_4 | cpu_addr_5 | cpu_addr_6 | cpu_addr_7
-			| cpu_addr_8 | cpu_addr_9 | cpu_addr_A | cpu_addr_C | cpu_addr_E)) |
-			(CS2 & (cpu_addr_0 | cpu_addr_1))); */
-	
-	assign DATA_o = cpu_bus;
+	assign DATA_o =					// need add (cpu_read & CS1)
+		cpu_addr_0 ? 8'h02 :		// MIDI UART 6850 Control reg
+		cpu_addr_1 ? 8'h0 :
+		cpu_addr_2 ? dest_channel :
+		cpu_addr_3 ? glob_reg :
+		cpu_addr_4 & (glob_reg_l2[7:6] == 2'h2) ? glob_data_bus[7:0] :
+		cpu_addr_4 & glob_reg_l2[6] ? ( glob_addr_41 ? {dram_dma_invert_msb, dram_dma_irq_pending, dram_dma_irq_en_l, dram_dma_rate1, dram_dma_rate0, dram_dma_chan_width, dram_dma_dir, dram_dma_en_l} :
+												  glob_addr_45 ? {2'h0, timer_ctrl_b5, timer_ctrl_b4, timer2_irq_en, timer1_irq_en, timer_ctrl_b1, timer_ctrl_b0} :
+												  glob_addr_4c ? {5'h0, gf1_irq_enable, dac_enable, reset_reg_not} : 8'h0) :
+		cpu_addr_5 & (glob_reg_l2[7:6] == 2'h2) ? glob_data_bus[15:8] :
+		cpu_addr_6 ? { dma_tc_irq, ramp_irq, wave_irq, blaster_io_irq, timer2_irq, timer1_irq, midi_rx_irq, midi_tx_irq } :
+//		cpu_addr_7 ? (dram_addr_linear[0] ? DRAM_DATA_i[15:8] : DRAM_DATA_i[7:0]) :   // mem peek
+		cpu_addr_7 ? peek_reg :   // mem peek
+		cpu_addr_8 ? (~timer_ctrl_b0 ? { adlib_irq, timer1_expire, timer2_expire, blaster_io_dsp_req, blaster_io_dsp_reset_req, timer1_irq, timer2_irq, adlib_io_req } : reg_2XA) :
+		cpu_addr_9 ? adlib_data :
+		cpu_addr_A ? adlib_reg :
+		cpu_addr_C ? reg_2XC :
+		cpu_addr_E ? reg_2XE :
+										8'hFF;
+
 	
 	reg [7:0] glob_reg;
 	reg [7:0] glob_reg_l2;
@@ -406,15 +420,6 @@ module gf1
 	wire glob_addr_4b = glob_reg_l2[6:0] == 7'h4b;
 	wire glob_addr_4c = glob_reg_l2[6:0] == 7'h4c;
 	
-//	reg [7:0] glob_read_mux;
-	wire [7:0] glob_read_mux =
-		(glob_addr_41) ? {dram_dma_invert_msb, dram_dma_irq_pending, dram_dma_irq_en_l, dram_dma_rate1,
-								dram_dma_rate0, dram_dma_chan_width, dram_dma_dir, dram_dma_en_l} :
-		(glob_addr_45) ? {2'h0, timer_ctrl_b5, timer_ctrl_b4, timer2_irq_en, timer1_irq_en, timer_ctrl_b1, timer_ctrl_b0} :
-		(glob_addr_49) ? 8'd0 :
-		(glob_addr_4c) ? {5'h0, gf1_irq_enable, dac_enable, reset_reg_not} :
-								8'd0;
-
 	assign dma_writedata = dram_dma_rd_latch;
 
 	reg dram_dma_invert_msb;
@@ -2165,71 +2170,11 @@ module gf1
 
 		if (cpu_write_5 & glob_addr_44)
 			dram_peek_address[19:16] <= glob_data_l2[11:8];
-
-		if (w434) begin
-//			glob_data_read <= glob_data_bus;
-			if (cpu_addr_4)
-				cpu_bus[7:0] <= glob_data_bus[7:0];
-			if (cpu_addr_5)
-				cpu_bus[7:0] <= glob_data_bus[15:8];
-		end
 		
 		// cpu data bus
 		
 		if (cpu_input)
 			cpu_bus <= DATA_i;
-		
-		if (cpu_read)
-		begin
-			if (CS1) // GF1
-			begin
-				if (cpu_addr_1) // joystick
-					cpu_bus[7:0] <= 8'h0; // stub
-				if (cpu_addr_2) // Channel
-					cpu_bus[7:0] <= dest_channel;
-				if (cpu_addr_3) // Glob reg
-					cpu_bus[7:0] <= glob_reg;
-				if (glob_reg_l2[7:6] == 2'h2) // voice registers
-				begin
-/*					if (cpu_addr_4 | cpu_addr_5)
-						cpu_bus[15:8] <= glob_data_read[15:8];
-					if (cpu_addr_5 & ~IO16)
-						cpu_bus[7:0] <= glob_data_read[15:8];
-					if (cpu_addr_4 | (cpu_addr_5 & IO16))
-						cpu_bus[7:0] <= glob_data_read[7:0]; */
-					if (cpu_addr_5)
-						cpu_bus[7:0] <= glob_data_bus[15:8];
-				end
-				if (glob_reg_l2[6] & (cpu_addr_4 | cpu_addr_5))
-					cpu_bus <= glob_read_mux;
-				if (cpu_addr_6) // irq status
-					cpu_bus[7:0] <= { dma_tc_irq, ramp_irq, wave_irq, blaster_io_irq, timer2_irq, timer1_irq, midi_rx_irq, midi_tx_irq };
-//				if (cpu_addr_7) // mem peek
-//					cpu_bus[7:0] <= peek_reg;
-				if (cpu_addr_8) // adlib status
-				begin
-					if (~timer_ctrl_b0)
-						cpu_bus[7:0] <= { adlib_irq, timer1_expire, timer2_expire, blaster_io_dsp_req, blaster_io_dsp_reset_req, timer1_irq, timer2_irq, adlib_io_req };
-					else
-						cpu_bus[7:0] <= reg_2XA;
-				end
-				if (cpu_addr_9) // adlib data
-					cpu_bus[7:0] <= adlib_data;
-				if (cpu_addr_A) // adlib reg
-					cpu_bus[7:0] <= adlib_reg;
-				if (cpu_addr_C) // blaster dsp
-					cpu_bus[7:0] <= reg_2XC;
-				if (cpu_addr_E) // blaster status
-					cpu_bus[7:0] <= reg_2XE;
-			end
-			if (CS1) // MIDI
-			begin
-				if (cpu_addr_0)    // MIDI UART 6850 Control reg
-					cpu_bus[7:0] <= 8'h2; // stub
-//				if (cpu_addr_1)
-//					cpu_bus[7:0] <= 8'h0; // stub
-			end
-		end
 		
 		if (cpu_write)
 		begin
@@ -2583,10 +2528,8 @@ module gf1
 		else if (clk_sel[9] & dram_pp_enable)
 			dram_pp_state <= 1'h1;
 
-//		if (dram_cpu_pp & ~dram_pp_state)
-//			peek_reg <= dram_bus[7:0];
 		if (dram_cpu_peek_t  & ~dram_pp_state)
-			cpu_bus[7:0] <= dram_bus[7:0];
+			peek_reg[7:0] <= dram_bus[7:0];
 
 		if (clk3)
 			dram_voice_access_16 <= wave_params[2];
