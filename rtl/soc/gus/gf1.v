@@ -64,10 +64,161 @@ module gf1
 	wire chan_irq_match = chan_cmp_l2 == chan_irq_l;
 	
 	wire [147:0] ram_right_bus;
-	reg [147:0] ram_left_bus;
+	wire [147:0] ram_left_bus;
 	reg [147:0] ram_output_latch;
 	reg [147:0] ram_input_latch;
 	
+	assign	ram_left_bus[145] = ram_input_latch[145];
+	assign	ram_left_bus[144] = ram_input_latch[144];
+	assign	ram_left_bus[143] = ram_input_latch[143];
+	assign	ram_left_bus[142] = ram_input_latch[142];
+	assign	ram_left_bus[141] = ram_input_latch[141];
+	assign	ram_left_bus[138] = ram_input_latch[138];
+	assign	ram_left_bus[137] = ram_input_latch[137];
+	assign	ram_left_bus[135] = ram_input_latch[135];
+	assign	ram_left_bus[134] = ram_input_latch[134];
+	assign	ram_left_bus[132] = ram_input_latch[132];
+	assign	ram_left_bus[131] = ram_input_latch[131];
+	assign	ram_left_bus[129] = ram_input_latch[129];
+	assign	ram_left_bus[128] = ram_input_latch[128];
+	assign	ram_left_bus[126] = ram_input_latch[126];
+	assign	ram_left_bus[125] = ram_input_latch[125];
+	assign	ram_left_bus[123] = ram_input_latch[123];
+	assign	ram_left_bus[122] = ram_input_latch[122];
+	assign	ram_left_bus[120] = ram_input_latch[120];
+	assign	ram_left_bus[119] = ram_input_latch[119];
+	assign	ram_left_bus[117] = ram_input_latch[117];
+	assign	ram_left_bus[116] = ram_input_latch[116];
+	assign	ram_left_bus[114] = ram_input_latch[114];
+	assign	ram_left_bus[113] = ram_input_latch[113];
+	assign	ram_left_bus[111] = ram_input_latch[111];
+	assign	ram_left_bus[110] = ram_input_latch[110];
+	assign	ram_left_bus[108] = ram_input_latch[108];
+	assign	ram_left_bus[107] = ram_input_latch[107];
+	assign	ram_left_bus[105] = ram_input_latch[105];
+	assign	ram_left_bus[104] = ram_input_latch[104];
+	assign	ram_left_bus[102] = ram_input_latch[102];
+	assign	ram_left_bus[101] = ram_input_latch[101];
+	assign	ram_left_bus[99] = ram_input_latch[99];
+	assign	ram_left_bus[98] = ram_input_latch[98];
+	assign	ram_left_bus[96] = ram_input_latch[96];
+	assign	ram_left_bus[95] = ram_input_latch[95];
+	assign	ram_left_bus[94] = ram_input_latch[94];
+	assign	ram_left_bus[92] = ram_input_latch[92];
+	assign	ram_left_bus[91] = ram_input_latch[91];
+	assign	ram_left_bus[90] = ram_input_latch[90];
+	assign	ram_left_bus[88] = ram_input_latch[88];
+	assign	ram_left_bus[87] = ram_input_latch[87];
+	assign	ram_left_bus[86] = ram_input_latch[86];
+	assign	ram_left_bus[84] = ram_input_latch[84];
+	assign	ram_left_bus[83] = ram_input_latch[83];
+	assign	ram_left_bus[82] = ram_input_latch[82];
+	assign	ram_left_bus[80] = ram_input_latch[80];
+	assign	ram_left_bus[79] = ram_input_latch[79];
+	assign	ram_left_bus[78] = ram_input_latch[78];
+	assign	ram_left_bus[76] = ram_input_latch[76];
+	assign	ram_left_bus[75] = ram_input_latch[75];
+	assign	ram_left_bus[74] = ram_input_latch[74];
+	assign	ram_left_bus[72] = ram_input_latch[72];
+	assign	ram_left_bus[71] = ram_input_latch[71];
+	assign	ram_left_bus[70] = ram_input_latch[70];
+	assign	ram_left_bus[68] = ram_input_latch[68];
+	assign	ram_left_bus[67] = ram_input_latch[67];
+	assign	ram_left_bus[66] = ram_input_latch[66];
+	assign	ram_left_bus[64] = ram_input_latch[64];
+	assign	ram_left_bus[63] = ram_input_latch[63];
+	assign	ram_left_bus[62] = ram_input_latch[62];
+	assign	ram_left_bus[60] = ram_input_latch[60];
+	assign	ram_left_bus[59] = ram_input_latch[59];
+	assign	ram_left_bus[58] = ram_input_latch[58];
+	assign	ram_left_bus[56] = ram_input_latch[56];
+	assign	ram_left_bus[54] = ram_input_latch[54];
+	assign	ram_left_bus[52] = ram_input_latch[52];
+	assign	ram_left_bus[50] = ram_input_latch[50];
+	assign	ram_left_bus[48] = ram_input_latch[48];
+	assign	ram_left_bus[47] = ram_input_latch[47];
+	assign	ram_left_bus[46] = ram_input_latch[46];
+	assign	ram_left_bus[45] = ram_input_latch[45];
+	assign	ram_left_bus[44] = ram_input_latch[44];
+	assign	ram_left_bus[43] = ram_input_latch[43];
+	assign	ram_left_bus[42] = ram_input_latch[42];
+	assign	ram_left_bus[39] = ram_input_latch[39];
+	assign	ram_left_bus[38] = ram_input_latch[38];
+	assign	ram_left_bus[37] = ram_input_latch[37];
+	assign	ram_left_bus[36] = ram_input_latch[36];
+	assign	ram_left_bus[35] = ram_input_latch[35];
+	assign	ram_left_bus[32] = ram_input_latch[32];
+	assign	ram_left_bus[31] = ram_input_latch[31];
+	assign	ram_left_bus[29] = ram_input_latch[29];
+	assign	ram_left_bus[28] = ram_input_latch[28];
+	assign	ram_left_bus[26] = ram_input_latch[26];
+	assign	ram_left_bus[25] = ram_input_latch[25];
+	assign	ram_left_bus[23] = ram_input_latch[23];
+	assign	ram_left_bus[22] = ram_input_latch[22];
+	assign	ram_left_bus[20] = ram_input_latch[20];
+	assign	ram_left_bus[19] = ram_input_latch[19];
+	assign	ram_left_bus[17] = ram_input_latch[17];
+	assign	ram_left_bus[16] = ram_input_latch[16];
+	assign	ram_left_bus[14] = ram_input_latch[14];
+	assign	ram_left_bus[13] = ram_input_latch[13];
+	assign	ram_left_bus[12] = ram_input_latch[12];
+	assign	ram_left_bus[10] = ram_input_latch[10];
+	assign	ram_left_bus[9] = ram_input_latch[9];
+	assign	ram_left_bus[8] = ram_input_latch[8];
+	assign	ram_left_bus[6] = ram_input_latch[6];
+	assign	ram_left_bus[4] = ram_input_latch[4];
+	assign	ram_left_bus[2] = ram_input_latch[2];
+	assign	ram_left_bus[0] = ram_input_latch[0];
+	// Self-modifying reg
+	assign	ram_left_bus[147] = w134 ? wave_params_l2[2][2] & ~wave_irq_clear_l5 : ram_input_latch[147];
+	assign	ram_left_bus[146] = w1863 ? wave_params_l2[2][1] : ram_input_latch[146];
+	assign	ram_left_bus[140] = w1863 ? wave_params_l2[2][0] : ram_input_latch[140];
+	assign	ram_left_bus[139] = w1863 ? wave_next_l[5][28] : ram_input_latch[139];
+	assign	ram_left_bus[136] = w1863 ? wave_next_l[5][27] : ram_input_latch[136];
+	assign	ram_left_bus[133] = w1863 ? wave_next_l[5][26] : ram_input_latch[133];
+	assign	ram_left_bus[130] = w1863 ? wave_next_l[5][25] : ram_input_latch[130];
+	assign	ram_left_bus[127] = w1863 ? wave_next_l[5][24] : ram_input_latch[127];
+	assign	ram_left_bus[124] = w1863 ? wave_next_l[5][23] : ram_input_latch[124];
+	assign	ram_left_bus[121] = w1863 ? wave_next_l[5][22] : ram_input_latch[121];
+	assign	ram_left_bus[118] = w1863 ? wave_next_l[5][21] : ram_input_latch[118];
+	assign	ram_left_bus[115] = w1863 ? wave_next_l[5][20] : ram_input_latch[115];
+	assign	ram_left_bus[112] = w1863 ? wave_next_l[5][19] : ram_input_latch[112];
+	assign	ram_left_bus[109] = w1863 ? wave_next_l[5][18] : ram_input_latch[109];
+	assign	ram_left_bus[106] = w1863 ? wave_next_l[5][17] : ram_input_latch[106];
+	assign	ram_left_bus[103] = w1863 ? wave_next_l[5][16] : ram_input_latch[103];
+	assign	ram_left_bus[100] = w1863 ? wave_next_l[5][15] : ram_input_latch[100];
+	assign	ram_left_bus[97] = w1863 ? wave_next_l[5][14] : ram_input_latch[97];
+	assign	ram_left_bus[93] = w1863 ? wave_next_l[5][13] : ram_input_latch[93];
+	assign	ram_left_bus[89] = w1863 ? wave_next_l[5][12] : ram_input_latch[89];
+	assign	ram_left_bus[85] = w1863 ? wave_next_l[5][11] : ram_input_latch[85];
+	assign	ram_left_bus[81] = w1863 ? wave_next_l[5][10] : ram_input_latch[81];
+	assign	ram_left_bus[77] = w1863 ? wave_next_l[5][9] : ram_input_latch[77];
+	assign	ram_left_bus[73] = w1863 ? wave_next_l[5][8] : ram_input_latch[73];
+	assign	ram_left_bus[69] = w1863 ? wave_next_l[5][7] : ram_input_latch[69];
+	assign	ram_left_bus[65] = w1863 ? wave_next_l[5][6] : ram_input_latch[65];
+	assign	ram_left_bus[61] = w1863 ? wave_next_l[5][5] : ram_input_latch[61];
+	assign	ram_left_bus[57] = w1863 ? wave_next_l[5][4] : ram_input_latch[57];
+	assign	ram_left_bus[55] = w1863 ? wave_next_l[5][3] : ram_input_latch[55];
+	assign	ram_left_bus[53] = w1863 ? wave_next_l[5][2] : ram_input_latch[53];
+	assign	ram_left_bus[51] = w1863 ? wave_next_l[5][1] : ram_input_latch[51];
+	assign	ram_left_bus[49] = w1863 ? wave_next_l[5][0] : ram_input_latch[49];
+
+	assign	ram_left_bus[41] = w134 ? ramp_params_l2[2][2] & ~ramp_irq_clear_l5 : ram_input_latch[41];
+	assign	ram_left_bus[40] = w1982 ? ramp_params_l2[2][1] : ram_input_latch[40];
+	assign	ram_left_bus[34] = w1982 ? ramp_params_l2[2][0] : ram_input_latch[34];
+	assign	ram_left_bus[33] = w1982 ? ramp_next_l[5][11] : ram_input_latch[33];
+	assign	ram_left_bus[30] = w1982 ? ramp_next_l[5][10] : ram_input_latch[30];
+	assign	ram_left_bus[27] = w1982 ? ramp_next_l[5][9] : ram_input_latch[27];
+	assign	ram_left_bus[24] = w1982 ? ramp_next_l[5][8] : ram_input_latch[24];
+	assign	ram_left_bus[21] = w1982 ? ramp_next_l[5][7] : ram_input_latch[21];
+	assign	ram_left_bus[18] = w1982 ? ramp_next_l[5][6] : ram_input_latch[18];
+	assign	ram_left_bus[15] = w1982 ? ramp_next_l[5][5] : ram_input_latch[15];
+	assign	ram_left_bus[11] = w1982 ? ramp_next_l[5][4] : ram_input_latch[11];
+	assign	ram_left_bus[7] = w1982 ? ramp_next_l[5][3] : ram_input_latch[7];
+	assign	ram_left_bus[5] = w1982 ? ramp_next_l[5][2] : ram_input_latch[5];
+	assign	ram_left_bus[3] = w1982 ? ramp_next_l[5][1] : ram_input_latch[3];
+	assign	ram_left_bus[1] = w1982 ? ramp_next_l[5][0] : ram_input_latch[1];
+
 	wire [7:0] wave_params = ram_output_latch[147:140];
 	reg [5:0] wave_params_l1[0:2];
 	reg [2:0] wave_params_l2[0:2];
@@ -679,10 +830,6 @@ module gf1
 	reg w134;
 	reg w1863;
 	reg w1982;
-	
-	reg w1800;
-	reg w1801;
-	reg w1944;
 	
 	reg w434;
 	
@@ -1411,267 +1558,6 @@ module gf1
 		//if (chan_c0 & ~ramp_is_stopped_l[4])
 		//	w1982 = clk2;
 		w1982 = (chan_c0 & ~ramp_is_stopped_l[4]) & clk2;
-		
-		if (w134)
-		begin
-			ram_left_bus[147] <= wave_params_l2[2][2] & ~wave_irq_clear_l5;
-			ram_left_bus[41] <= ramp_params_l2[2][2] & ~ramp_irq_clear_l5;
-		end
-		if (w1863)
-		begin
-			ram_left_bus[146] <= wave_params_l2[2][1];
-			ram_left_bus[140] <= wave_params_l2[2][0];
-			ram_left_bus[139] <= wave_next_l[5][28];
-			ram_left_bus[136] <= wave_next_l[5][27];
-			ram_left_bus[133] <= wave_next_l[5][26];
-			ram_left_bus[130] <= wave_next_l[5][25];
-			ram_left_bus[127] <= wave_next_l[5][24];
-			ram_left_bus[124] <= wave_next_l[5][23];
-			ram_left_bus[121] <= wave_next_l[5][22];
-			ram_left_bus[118] <= wave_next_l[5][21];
-			ram_left_bus[115] <= wave_next_l[5][20];
-			ram_left_bus[112] <= wave_next_l[5][19];
-			ram_left_bus[109] <= wave_next_l[5][18];
-			ram_left_bus[106] <= wave_next_l[5][17];
-			ram_left_bus[103] <= wave_next_l[5][16];
-			ram_left_bus[100] <= wave_next_l[5][15];
-			ram_left_bus[97] <= wave_next_l[5][14];
-			ram_left_bus[93] <= wave_next_l[5][13];
-			ram_left_bus[89] <= wave_next_l[5][12];
-			ram_left_bus[85] <= wave_next_l[5][11];
-			ram_left_bus[81] <= wave_next_l[5][10];
-			ram_left_bus[77] <= wave_next_l[5][9];
-			ram_left_bus[73] <= wave_next_l[5][8];
-			ram_left_bus[69] <= wave_next_l[5][7];
-			ram_left_bus[65] <= wave_next_l[5][6];
-			ram_left_bus[61] <= wave_next_l[5][5];
-			ram_left_bus[57] <= wave_next_l[5][4];
-			ram_left_bus[55] <= wave_next_l[5][3];
-			ram_left_bus[53] <= wave_next_l[5][2];
-			ram_left_bus[51] <= wave_next_l[5][1];
-			ram_left_bus[49] <= wave_next_l[5][0];
-		end
-		if (w1982)
-		begin
-			ram_left_bus[40] <= ramp_params_l2[2][1];
-			ram_left_bus[34] <= ramp_params_l2[2][0];
-			ram_left_bus[33] <= ramp_next_l[5][11];
-			ram_left_bus[30] <= ramp_next_l[5][10];
-			ram_left_bus[27] <= ramp_next_l[5][9];
-			ram_left_bus[24] <= ramp_next_l[5][8];
-			ram_left_bus[21] <= ramp_next_l[5][7];
-			ram_left_bus[18] <= ramp_next_l[5][6];
-			ram_left_bus[15] <= ramp_next_l[5][5];
-			ram_left_bus[11] <= ramp_next_l[5][4];
-			ram_left_bus[7] <= ramp_next_l[5][3];
-			ram_left_bus[5] <= ramp_next_l[5][2];
-			ram_left_bus[3] <= ramp_next_l[5][1];
-			ram_left_bus[1] <= ramp_next_l[5][0];
-		end
-		
-		//if (w134)
-		//	w1800 = ram_strobe;
-		w1800 = ram_strobe & w134;
-		//if (w100 | (w134 & ~w1863))
-		//	w1801 = ram_strobe;
-		w1801 = ram_strobe & (w100 | (w134 & ~w1863));
-		//if (w100 | (w134 & ~w1982))
-		//	w1944 = ram_strobe;
-		w1944 = ram_strobe & (w100 | (w134 & ~w1982));
-		if (w1800 | w1801)
-		begin
-			ram_left_bus[145] <= ram_input_latch[145];
-			ram_left_bus[144] <= ram_input_latch[144];
-			ram_left_bus[143] <= ram_input_latch[143];
-			ram_left_bus[142] <= ram_input_latch[142];
-			ram_left_bus[141] <= ram_input_latch[141];
-			
-			ram_left_bus[138] <= ram_input_latch[138];
-			ram_left_bus[137] <= ram_input_latch[137];
-			ram_left_bus[135] <= ram_input_latch[135];
-			ram_left_bus[134] <= ram_input_latch[134];
-			ram_left_bus[132] <= ram_input_latch[132];
-			
-			ram_left_bus[131] <= ram_input_latch[131];
-			ram_left_bus[129] <= ram_input_latch[129];
-			ram_left_bus[128] <= ram_input_latch[128];
-			ram_left_bus[126] <= ram_input_latch[126];
-			ram_left_bus[125] <= ram_input_latch[125];
-			
-			ram_left_bus[123] <= ram_input_latch[123];
-			ram_left_bus[122] <= ram_input_latch[122];
-			ram_left_bus[120] <= ram_input_latch[120];
-			ram_left_bus[119] <= ram_input_latch[119];
-			ram_left_bus[117] <= ram_input_latch[117];
-			ram_left_bus[116] <= ram_input_latch[116];
-			
-			ram_left_bus[114] <= ram_input_latch[114];
-			ram_left_bus[113] <= ram_input_latch[113];
-			ram_left_bus[111] <= ram_input_latch[111];
-			ram_left_bus[110] <= ram_input_latch[110];
-			ram_left_bus[108] <= ram_input_latch[108];
-			
-			ram_left_bus[107] <= ram_input_latch[107];
-			ram_left_bus[105] <= ram_input_latch[105];
-			ram_left_bus[104] <= ram_input_latch[104];
-			ram_left_bus[102] <= ram_input_latch[102];
-			ram_left_bus[101] <= ram_input_latch[101];
-			
-			ram_left_bus[99] <= ram_input_latch[99];
-			ram_left_bus[98] <= ram_input_latch[98];
-			ram_left_bus[96] <= ram_input_latch[96];
-			ram_left_bus[95] <= ram_input_latch[95];
-			ram_left_bus[94] <= ram_input_latch[94];
-			ram_left_bus[92] <= ram_input_latch[92];
-			
-			ram_left_bus[91] <= ram_input_latch[91];
-			ram_left_bus[90] <= ram_input_latch[90];
-			ram_left_bus[88] <= ram_input_latch[88];
-			ram_left_bus[87] <= ram_input_latch[87];
-			ram_left_bus[86] <= ram_input_latch[86];
-			ram_left_bus[84] <= ram_input_latch[84];
-			
-			ram_left_bus[83] <= ram_input_latch[83];
-			ram_left_bus[82] <= ram_input_latch[82];
-			ram_left_bus[80] <= ram_input_latch[80];
-			ram_left_bus[79] <= ram_input_latch[79];
-			ram_left_bus[78] <= ram_input_latch[78];
-			ram_left_bus[76] <= ram_input_latch[76];
-			
-			ram_left_bus[75] <= ram_input_latch[75];
-			ram_left_bus[74] <= ram_input_latch[74];
-			ram_left_bus[72] <= ram_input_latch[72];
-			ram_left_bus[71] <= ram_input_latch[71];
-			ram_left_bus[70] <= ram_input_latch[70];
-			ram_left_bus[68] <= ram_input_latch[68];
-			
-			ram_left_bus[67] <= ram_input_latch[67];
-			ram_left_bus[66] <= ram_input_latch[66];
-			ram_left_bus[64] <= ram_input_latch[64];
-			ram_left_bus[63] <= ram_input_latch[63];
-			ram_left_bus[62] <= ram_input_latch[62];
-			ram_left_bus[60] <= ram_input_latch[60];
-			
-			ram_left_bus[59] <= ram_input_latch[59];
-			ram_left_bus[58] <= ram_input_latch[58];
-			ram_left_bus[56] <= ram_input_latch[56];
-			ram_left_bus[54] <= ram_input_latch[54];
-			ram_left_bus[52] <= ram_input_latch[52];
-			
-			ram_left_bus[50] <= ram_input_latch[50];
-			ram_left_bus[48] <= ram_input_latch[48];
-			ram_left_bus[47] <= ram_input_latch[47];
-			ram_left_bus[46] <= ram_input_latch[46];
-			ram_left_bus[45] <= ram_input_latch[45];
-			ram_left_bus[44] <= ram_input_latch[44];
-			
-			ram_left_bus[43] <= ram_input_latch[43];
-			ram_left_bus[42] <= ram_input_latch[42];
-			ram_left_bus[39] <= ram_input_latch[39];
-			ram_left_bus[38] <= ram_input_latch[38];
-			ram_left_bus[37] <= ram_input_latch[37];
-			ram_left_bus[36] <= ram_input_latch[36];
-			
-			ram_left_bus[35] <= ram_input_latch[35];
-			ram_left_bus[32] <= ram_input_latch[32];
-			ram_left_bus[31] <= ram_input_latch[31];
-			ram_left_bus[29] <= ram_input_latch[29];
-			ram_left_bus[28] <= ram_input_latch[28];
-			
-			ram_left_bus[26] <= ram_input_latch[26];
-			ram_left_bus[25] <= ram_input_latch[25];
-			ram_left_bus[23] <= ram_input_latch[23];
-			ram_left_bus[22] <= ram_input_latch[22];
-			ram_left_bus[20] <= ram_input_latch[20];
-			
-			ram_left_bus[19] <= ram_input_latch[19];
-			ram_left_bus[17] <= ram_input_latch[17];
-			ram_left_bus[16] <= ram_input_latch[16];
-			ram_left_bus[14] <= ram_input_latch[14];
-			ram_left_bus[13] <= ram_input_latch[13];
-			ram_left_bus[12] <= ram_input_latch[12];
-			
-			ram_left_bus[10] <= ram_input_latch[10];
-			ram_left_bus[9] <= ram_input_latch[9];
-			ram_left_bus[8] <= ram_input_latch[8];
-			ram_left_bus[6] <= ram_input_latch[6];
-			ram_left_bus[4] <= ram_input_latch[4];
-			
-			ram_left_bus[2] <= ram_input_latch[2];
-			ram_left_bus[0] <= ram_input_latch[0];
-
-		end
-		if (w1801)  // Self-modifying bits
-		begin
-			ram_left_bus[147] <= ram_input_latch[147];
-			ram_left_bus[146] <= ram_input_latch[146];
-			ram_left_bus[140] <= ram_input_latch[140];
-			
-			ram_left_bus[139] <= ram_input_latch[139];
-			ram_left_bus[136] <= ram_input_latch[136];
-			ram_left_bus[133] <= ram_input_latch[133];
-			
-			ram_left_bus[130] <= ram_input_latch[130];
-			ram_left_bus[127] <= ram_input_latch[127];
-			ram_left_bus[124] <= ram_input_latch[124];
-			
-			ram_left_bus[121] <= ram_input_latch[121];
-			ram_left_bus[118] <= ram_input_latch[118];
-			
-			ram_left_bus[115] <= ram_input_latch[115];
-			ram_left_bus[112] <= ram_input_latch[112];
-			ram_left_bus[109] <= ram_input_latch[109];
-			
-			ram_left_bus[106] <= ram_input_latch[106];
-			ram_left_bus[103] <= ram_input_latch[103];
-			ram_left_bus[100] <= ram_input_latch[100];
-			
-			ram_left_bus[97] <= ram_input_latch[97];
-			ram_left_bus[93] <= ram_input_latch[93];
-			
-			ram_left_bus[89] <= ram_input_latch[89];
-			ram_left_bus[85] <= ram_input_latch[85];
-			
-			ram_left_bus[81] <= ram_input_latch[81];
-			ram_left_bus[77] <= ram_input_latch[77];
-			
-			ram_left_bus[73] <= ram_input_latch[73];
-			ram_left_bus[69] <= ram_input_latch[69];
-			
-			ram_left_bus[65] <= ram_input_latch[65];
-			ram_left_bus[61] <= ram_input_latch[61];
-			
-			ram_left_bus[57] <= ram_input_latch[57];
-			ram_left_bus[55] <= ram_input_latch[55];
-			ram_left_bus[53] <= ram_input_latch[53];
-			
-			ram_left_bus[51] <= ram_input_latch[51];
-			ram_left_bus[49] <= ram_input_latch[49];
-		end
-		
-		if (w1944)
-		begin
-			ram_left_bus[41] <= ram_input_latch[41];
-			ram_left_bus[40] <= ram_input_latch[40];
-			
-			ram_left_bus[34] <= ram_input_latch[34];
-			ram_left_bus[33] <= ram_input_latch[33];
-			ram_left_bus[30] <= ram_input_latch[30];
-			
-			ram_left_bus[27] <= ram_input_latch[27];
-			ram_left_bus[24] <= ram_input_latch[24];
-			ram_left_bus[21] <= ram_input_latch[21];
-			
-			ram_left_bus[18] <= ram_input_latch[18];
-			ram_left_bus[15] <= ram_input_latch[15];
-			
-			ram_left_bus[11] <= ram_input_latch[11];
-			ram_left_bus[7] <= ram_input_latch[7];
-			ram_left_bus[5] <= ram_input_latch[5];
-			
-			ram_left_bus[3] <= ram_input_latch[3];
-			ram_left_bus[1] <= ram_input_latch[1];
-		end
 		
 		// wave
 		
@@ -2782,7 +2668,7 @@ spram #(5,128) voice_bram1 (
     .clock     (MCLK),
     .address   (ram_addr_l),
     .data      (ram_left_bus[127:0]),
-    .wren      (voice_ram_update),
+    .wren      (ram_strobe & (w100 | w134)),
     .q         (ram_right_bus[127:0])
 );
 
@@ -2790,7 +2676,7 @@ spram #(5,20) voice_bram2 (
     .clock     (MCLK),
     .address   (ram_addr_l),
     .data      (ram_left_bus[147:128]),
-    .wren      (voice_ram_update),
+    .wren      (ram_strobe & (w100 | w134)),
     .q         (ram_right_bus[147:128])
 );
 
