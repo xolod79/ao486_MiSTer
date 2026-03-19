@@ -13,11 +13,10 @@ module gf1
 	output        IRQ1,
 	output        IRQ2,
 	input         DMA_TC,
-	input  [15:0] DATA_i,
+	input   [7:0] DATA_i,
 	output  [7:0] DATA_o,
 	input  [15:0] dma_readdata,
 	output [15:0] dma_writedata,
-	input         IO16,
 	input   [3:0] ADDRESS,
 	input  [15:0] DRAM_DATA_i,
 	output [15:0] DRAM_DATA_o,
@@ -540,14 +539,13 @@ module gf1
 		cpu_addr_C ? reg_2XC :
 		cpu_addr_E ? reg_2XE :
 										8'hFF;
-
 	
 	reg [7:0] glob_reg;
 	reg [7:0] glob_reg_l2;
 	reg [15:0] glob_data_read;
 	reg [7:0] glob_data_l1;
 	reg [15:0] glob_data_l2;
-	wire glob_data_exec = cpu_write & CS1 & ((cpu_addr_4 & IO16) | cpu_addr_5);
+	wire glob_data_exec = cpu_write & CS1 & cpu_addr_5;
 	reg glob_data_wr1;
 	reg glob_data_wr2;
 	reg glob_data_rd1;
@@ -1037,7 +1035,7 @@ module gf1
 			glob_reg_l2 <= glob_reg;
 			glob_data_l2[7:0] <= glob_data_l1;
 			if (glob_data_exec)
-				glob_data_l2[15:8] <= IO16 ? DATA_i[15:8] : DATA_i[7:0];
+				glob_data_l2[15:8] <= DATA_i[7:0];
 		end
 		
 		w434 = clk3 & voice_read_pending[1] & ~voice_write_pending[1];
@@ -2049,7 +2047,7 @@ module gf1
 			reset_reg_not <= 1'h0;
 		end
 
-		if (((cpu_write_4 & IO16) | cpu_write_5) & glob_addr_43)
+		if (cpu_write_5 & glob_addr_43)
 			dram_peek_address[15:0] <= glob_data_l2;
 
 		if (cpu_write_5 & glob_addr_44)
@@ -2065,7 +2063,7 @@ module gf1
 					dest_channel <= DATA_i[4:0];
 				if (cpu_addr_3)
 					glob_reg <= DATA_i[7:0];
-				if (cpu_addr_4 | (cpu_addr_5 & IO16))
+				if (cpu_addr_4)
 					glob_data_l1 <= DATA_i[7:0];
 				if (cpu_addr_A)
 					reg_2XA <= DATA_i[7:0];
@@ -2369,7 +2367,7 @@ module gf1
 		else if (cls9_dma_read | ~dram_dma_en)
 			dram_dma_read_state3 <= 1'h0;
 
-		if (((cpu_write_4 & IO16) | cpu_write_5) & glob_addr_42)
+		if (cpu_write_5 & glob_addr_42)
 		begin
 			dram_dma_address[0] <= { glob_data_l2, 4'h0 };
 			dram_dma_address[1] <= { glob_data_l2, 4'h0 };
