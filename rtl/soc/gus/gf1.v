@@ -492,8 +492,6 @@ module gf1
 	reg voice_irq_read_l;
 	reg voice_irq_read_l2;
 	
-	reg [15:0] cpu_bus;
-	
 	// stubs
 	
 //	wire rec_dma_chan_width = 0; // stub
@@ -2059,9 +2057,6 @@ module gf1
 		
 		// cpu data bus
 		
-		if (cpu_input)
-			cpu_bus <= DATA_i;
-		
 		if (cpu_write)
 		begin
 			if (CS1)
@@ -2453,7 +2448,7 @@ module gf1
 		end
 //		if (dram_io_dir & dram_pp_enable & dram_cpu_poke)
 		if (dram_io_dir & dram_pp_enable & (dram_cpu_poke | dram_cpu_poke_t))
-			dram_bus[7:0] <= cpu_bus[7:0];
+			dram_bus[7:0] <= DATA_i;
 		if (dram_io_dir & dram_dma_access & ~dram_dma_dir)
 			dram_bus <= dram_dma_in_data_sign;
 		if (dram_dma_read_state3)
