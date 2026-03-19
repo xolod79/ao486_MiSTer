@@ -731,6 +731,7 @@ gus gus
 	.write             (iobus_write),
 	.readdata          (gus_readdata),
 	.gus_cs            (gus_cs),
+	.fm_cs             (fm_cs),
 	.io_wait           (gus_wait),
 
 	.dma_req           (dma_gus_req),

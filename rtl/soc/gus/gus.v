@@ -7,6 +7,7 @@ module gus    // ULTRASND IO = 240, IRQ = 7, DMA = 7
 	input   [7:0] writedata,
 	output  [7:0] readdata,
 	input         gus_cs,
+	input         fm_cs,
 	input         write,
 	input         read,
 	output        io_wait,
@@ -97,10 +98,13 @@ reg  [1:0] write_wait;
 reg        read_d;
 reg        write_d;
 wire       gf1_read  = read  & gus_cs;
-wire       gf1_write = write & gus_cs;
+wire       gf1_write = write & (gus_cs | fm_cs);
 wire       read_cont =  (~read_d  & gf1_read)  | (|read_wait);
 wire       write_cont = (~write_d & gf1_write) | (|write_wait);
 assign     io_wait = gf1_wait | read_cont | write_cont;
+
+wire [7:0] readdata_gf1;
+assign  readdata = isgf1addr ? readdata_gf1 : 8'hff;
 
 /*	wire [15:0] gusbase = 16'h240;
 	wire isgf1addr = (io_address[15:4] == gusbase[15:4]
@@ -112,12 +116,14 @@ assign     io_wait = gf1_wait | read_cont | write_cont;
 	wire ismixeraddr = io_address == gusbase;
 	wire isdmairqaddr = io_address == (gusbase | 16'hb); */
 
-/*	wire isgf1addr = gus_cs & (~io_address8    // 240
-		& (io_address[3:0] == 4'h6 | io_address[3:0] == 4'h8 | io_address[3:0] == 4'h9
-		| io_address[3:0] == 4'ha | io_address[3:0] == 4'hc | io_address[3:0] == 4'he)) |
-		(io_address8                  // 340
-		& (io_address[3:0] == 4'h2 | io_address[3:0] == 4'h3 | io_address[3:0] == 4'h4
-		| io_address[3:0] == 4'h5 | io_address[3:0] == 4'h7)); */
+	wire isgf1addr = (gus_cs & (~io_address8		// 240
+		& (io_address[3:0] == 4'h6 | io_address[3:0] == 4'h8 | io_address[3:0] == 4'h9 |
+		   io_address[3:0] == 4'ha | io_address[3:0] == 4'hc | io_address[3:0] == 4'he)) |
+		(io_address8								// 340
+		& (io_address[3:0] == 4'h0 | io_address[3:0] == 4'h1 | io_address[3:0] == 4'h2 |
+			io_address[3:0] == 4'h3 | io_address[3:0] == 4'h4 | io_address[3:0] == 4'h5 |
+			io_address[3:0] == 4'h7)) ) |
+		fm_cs;
 	wire ismixeraddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'h0);
 //	wire isdmairqaddr = gus_cs & ~io_address8 & (io_address[3:0] == 4'hb);
 
@@ -134,10 +140,10 @@ gf1 gf1 (
 	.CLK           (gf1_clk2),
 	.IOW           (write_cont),
 	.IOR           (read_cont),
-	.CS1           (gus_cs),
+	.CS1           (isgf1addr),
 	.ADDRESS       (io_address[3:0]),
-	.DATA_i        ({8'd0, writedata}),
-	.DATA_o        (readdata),
+	.DATA_i        (writedata),
+	.DATA_o        (readdata_gf1),
 	.dma_writedata (dma_writedata),
 	.dma_readdata  (dma_readdata),
 	.DRQ1          (dreq),
