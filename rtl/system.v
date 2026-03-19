@@ -20,6 +20,7 @@ module system
 	input  [15:0] joystick_ana_1,
 	input  [15:0] joystick_ana_2,
 	input  [1:0]  joystick_mode,
+	input  [1:0]  joystick_timed,
 
 	input  [15:0] mgmt_address,
 	input         mgmt_read,
@@ -588,6 +589,7 @@ joystick joystick
 
 	.clock_rate        (clock_rate),
 
+	.read              (iobus_read & joy_cs),
 	.write             (iobus_write & joy_cs),
 	.readdata          (joystick_readdata),
 
@@ -597,7 +599,8 @@ joystick joystick
 	.dig_2             (joystick_dig_2),
 	.ana_1             (joystick_ana_1),
 	.ana_2             (joystick_ana_2),
-	.mode              (joystick_mode)
+	.mode              (joystick_mode),
+	.timed             (joystick_timed)
 );
 
 pit pit
