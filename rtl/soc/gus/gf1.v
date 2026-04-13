@@ -515,16 +515,11 @@ module gf1
 	wire cpu_addr_D = ADDRESS == 4'hD;
 	wire cpu_addr_E = ADDRESS == 4'hE;
 	
-	wire cpu_input = IOW & (
-		(CS1 & (cpu_addr_1 | cpu_addr_2 | cpu_addr_3 | cpu_addr_4 | cpu_addr_5 | cpu_addr_6 | cpu_addr_7
-			| cpu_addr_8 | cpu_addr_9 | cpu_addr_A | cpu_addr_C | cpu_addr_D | cpu_addr_E)) |
-			(CS2 & (cpu_addr_0 | cpu_addr_1)));
-	
 	assign DATA_o =					// need add (cpu_read & CS1)
 		cpu_addr_0 ? 8'h02 :		// MIDI UART 6850 Control reg
 		cpu_addr_1 ? 8'h0 :
-		cpu_addr_2 ? dest_channel :
-		cpu_addr_3 ? glob_reg :
+		cpu_addr_2 ? {3'b111, dest_channel} :
+		cpu_addr_3 ? {2'b11, glob_reg[5:0]} :
 		cpu_addr_4 & (glob_reg_l2[7:6] == 2'h2) ? glob_data_bus[7:0] :
 		cpu_addr_4 & glob_reg_l2[6] ? ( glob_addr_41 ? {dram_dma_invert_msb, dram_dma_irq_pending, dram_dma_irq_en_l, dram_dma_rate1, dram_dma_rate0, dram_dma_chan_width, dram_dma_dir, dram_dma_en_l} :
 												  glob_addr_45 ? {2'h0, timer_ctrl_b5, timer_ctrl_b4, timer2_irq_en, timer1_irq_en, timer_ctrl_b1, timer_ctrl_b0} :
