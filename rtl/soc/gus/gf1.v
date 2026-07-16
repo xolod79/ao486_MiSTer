@@ -865,6 +865,7 @@ module gf1
 	wire accum_clip2 = accum_sum[20] & (accum_sum[19:15] != 5'h1f);
 	wire [15:0] accum_clip = accum_clip2 ? 16'h8000 : (accum_clip1 ? 16'h7fff : accum_sum[15:0]);
 
+	reg [15:0] audio_l_t;
 	reg [5:0] dac_counter[0:1];
 	reg w2008[0:1];
 	reg w2007;
@@ -2157,7 +2158,7 @@ module gf1
 		else
 		begin
 			clk_div_cnt[1] = clk_div_cnt[0];
-			clk_div_reset[0] = clk_div_cnt[1][3] & clk_div_cnt[1][0];
+			clk_div_reset[0] = clk_div_cnt[1][3] & clk_div_cnt[1][0];   // count from 0 to 9
 		end
 		
 		if (RESET | clk_div_reset[1])
@@ -2618,8 +2619,11 @@ module gf1
 			audio_l <= 16'h0;
 			audio_r <= 16'h0;
 		end else begin
-			if (dac_counter[1] == 6'h5) audio_l <= accum_clip;
-			if (dac_counter[1] == 6'h9) audio_r <= accum_clip;
+			if (dac_counter[1] == 6'h5) audio_l_t <= accum_clip;
+			if (dac_counter[1] == 6'h9) begin
+                           audio_r <= accum_clip;
+			   audio_l <= audio_l_t;
+                        end
 		end
 
 	end

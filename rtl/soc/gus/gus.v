@@ -63,7 +63,6 @@ wire [15:0] DRAM_i;
 wire word;
 wire dram_access;
 wire dram_we;
-wire dram_refresh;
 
 sdram sdram (
 	.init             (~pll_locked),
@@ -159,7 +158,6 @@ gf1 gf1 (
 	.DRAM_DATA_i   (DRAM_i),
 	.DRAM_DATA_o   (DRAM_o),
 	.dram_we       (dram_we),
-	.dram_refresh  (dram_refresh),
 	.audio_l       (audio_l),
 	.audio_r       (audio_r)
 );
