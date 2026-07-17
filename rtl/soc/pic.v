@@ -88,7 +88,7 @@ i8259 pic_sla
 	.io_write(io_write & io_slave_cs),
 	.io_writedata(io_writedata),
 
-	.interrupt_input(interrupt_input[15:8]),
+	.interrupt_input({interrupt_input[15:10], interrupt_input[9] | interrupt_input[2], interrupt_input[8]}),
 
 	.interrupt_do(sla_int),
 	.interrupt_vector(sla_vector),

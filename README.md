@@ -49,6 +49,11 @@ Optional programs and drivers:  https://github.com/MiSTer-devel/ao486_MiSTer/tre
 * sbctl.exe: set Sound Blaster configs.  Supported: I5,I7,I10,H5,H1,T4,T6
 * sysctl.exe: Used for setting core options and cache referenced above from command line. Usase: SYSCTL SYS/MENU 90Mhz/56Mhz/15Mhz L1+/L1- L2+/L2-
 
+### Gravis UltraSound
+Default config: baseport=240, IRQ1=7, IRQ2=7, DMA1=7, DMA2=7. (SET ULTRASND=240,7,7,7,7)
+If you changed(sbctl.exe tool) SB IRQ to 7, GUS IRQ1&2 changed to 5.
+Supported GUS 1MB DRAM(required SDRAM module). Any CPU frequency, except 15MHz(too slow).
+
 ### Sound Blaster
 Default config: A220 I5 D1 H5 T6
 Supported alternative configs with IRQ 7 or 10 and/or no-HDMA (16bit DMA through 8bit DMA).

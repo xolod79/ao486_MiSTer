@@ -73,6 +73,8 @@ module system
 	output [15:0] sample_opl_r,
 	input         sound_fm_mode,
 	input         sound_cms_en,
+	output [15:0] sample_gus_l,
+	output [15:0] sample_gus_r,
 
 	output        speaker_out,
 
@@ -124,7 +126,20 @@ module system
 	output        DDRAM_RD,
 	output [63:0] DDRAM_DIN,
 	output  [7:0] DDRAM_BE,
-	output        DDRAM_WE
+	output        DDRAM_WE,
+
+	input         pll_locked,
+	output        SDRAM_CLK,
+	output        SDRAM_CKE,
+	output [12:0] SDRAM_A,
+	output  [1:0] SDRAM_BA,
+	inout  [15:0] SDRAM_DQ,
+	output        SDRAM_DQML,
+	output        SDRAM_DQMH,
+	output        SDRAM_nCS,
+	output        SDRAM_nCAS,
+	output        SDRAM_nRAS,
+	output        SDRAM_nWE
 );
 
 wire        a20_enable;
@@ -140,6 +155,11 @@ wire        dma_sb_ack_16;
 wire  [7:0] dma_sb_readdata_8;
 wire [15:0] dma_sb_readdata_16;
 wire [15:0] dma_sb_writedata;
+wire        dma_gus_req;
+wire        dma_gus_ack;
+wire        dma_gus_tc;
+wire [15:0] dma_gus_readdata;
+wire [15:0] dma_gus_writedata;
 wire [15:0] dma_readdata;
 wire        dma_waitrequest;
 wire [23:0] dma_address;
@@ -160,8 +180,35 @@ wire        mgmt_rtc_cs;
 wire        interrupt_done;
 wire        interrupt_do;
 wire  [7:0] interrupt_vector;
-reg  [15:0] interrupt;
-wire        irq_0, irq_1, irq_2, irq_3, irq_4, irq_5, irq_6, irq_7, irq_8, irq_9, irq_10, irq_12, irq_14, irq_15;
+wire [15:0] irq;
+
+// IRQ map:
+//
+//  0 - PIT
+//  1 - Keyboard
+//  2 - VGA
+//  3 - UART 2
+//  4 - UART 1
+//  5 - SB, GUS
+//  6 - Floppy
+//  7 - SB, GUS
+//  8 - RTC
+//  9 - MPU(MIDI)
+// 10 - SB
+// 11 - 
+// 12 - Mouse
+// 13 - 
+// 14 - IDE 0
+// 15 - IDE 1
+assign irq[11] = 0;
+assign irq[13] = 0;
+
+
+wire        sb_irq;
+wire        sb_irq_5_en;
+wire        sb_irq_7_en;
+wire        sb_irq_10_en;
+wire        gus_irq;
 
 wire        cpu_io_read_do;
 wire [15:0] cpu_io_read_address;
@@ -194,6 +241,7 @@ reg         joy_cs;
 reg         rtc_cs;
 reg         fm_cs;
 reg         sb_cs;
+reg         gus_cs;
 reg         uart1_cs;
 reg         uart2_cs;
 reg         mpu_cs;
@@ -204,7 +252,10 @@ reg         sysctl_cs;
 
 wire        fdd0_inserted;
 
+wire        gus_wait;
+
 wire  [7:0] sound_readdata;
+wire  [7:0] gus_readdata;
 wire  [7:0] floppy0_readdata;
 wire [31:0] ide0_readdata;
 wire [31:0] ide1_readdata;
@@ -341,6 +392,7 @@ always @(posedge clk_sys) begin
 	rtc_cs        <= ({iobus_address[15:1], 1'd0} == 16'h0070);
 	fm_cs         <= ({iobus_address[15:2], 2'd0} == 16'h0388);
 	sb_cs         <= ({iobus_address[15:4], 4'd0} == 16'h0220);
+	gus_cs        <= ({iobus_address[15:4], 4'd0} == 16'h0240) || ({iobus_address[15:4], 4'd0} == 16'h0340);
 	uart1_cs      <= ({iobus_address[15:3], 3'd0} == 16'h03F8);
 	uart2_cs      <= ({iobus_address[15:3], 3'd0} == 16'h02F8);
 	mpu_cs        <= ({iobus_address[15:1], 1'd0} == 16'h0330);
@@ -377,6 +429,7 @@ wire [7:0] iobus_readdata8 =
 	( ps2_io_cs|ps2_ctl_cs                   ) ? ps2_readdata      :
 	( rtc_cs                                 ) ? rtc_readdata      :
 	( sb_cs|fm_cs                            ) ? sound_readdata    :
+	( gus_cs                                 ) ? gus_readdata      :
 	( uart1_cs                               ) ? uart1_readdata    :
 	( uart2_cs                               ) ? uart2_readdata    :
 	( mpu_cs                                 ) ? mpu_readdata      :
@@ -407,7 +460,7 @@ iobus iobus
 	.bus_datasize      (iobus_datasize),
 	.bus_writedata     (iobus_writedata),
 	.bus_readdata      (ide0_cs ? ide0_readdata : ide1_cs ? ide1_readdata : iobus_readdata8),
-	.bus_wait          (ide0_wait | ide1_wait)
+	.bus_wait          (ide0_wait | ide1_wait | gus_wait)
 );
 
 dma dma
@@ -447,7 +500,13 @@ dma dma
 	.dma_5_req         (dma_sb_req_16),
 	.dma_5_ack         (dma_sb_ack_16),
 	.dma_5_readdata    (dma_sb_readdata_16),
-	.dma_5_writedata   (dma_sb_writedata)
+	.dma_5_writedata   (dma_sb_writedata),
+
+	.dma_7_req         (dma_gus_req),
+	.dma_7_ack         (dma_gus_ack),
+	.dma_7_tc          (dma_gus_tc),
+	.dma_7_readdata    (dma_gus_readdata),
+	.dma_7_writedata   (dma_gus_writedata)
 );
 
 floppy floppy
@@ -481,7 +540,7 @@ floppy floppy
 	.wp                (floppy_wp),
 
 	.request           (fdd_request),
-	.irq               (irq_6)
+	.irq               (irq[6])
 );
 
 wire [3:0] ide_address = {iobus_address[9],iobus_address[2:0]};
@@ -515,7 +574,7 @@ ide ide0
 	.mgmt_read         (mgmt_read & mgmt_ide0_cs),
 
 	.request           (ide0_request),
-	.irq               (irq_14)
+	.irq               (irq[14])
 );
 
 wire ide1_nodata;
@@ -547,7 +606,7 @@ ide ide1
 	.mgmt_read         (mgmt_read & mgmt_ide1_cs),
 
 	.request           (ide1_request),
-	.irq               (irq_15)
+	.irq               (irq[15])
 );
 
 joystick joystick
@@ -585,7 +644,7 @@ pit pit
 	.io_write          (iobus_write & pit_cs),
 
 	.speaker_out       (speaker_out),
-	.irq               (irq_0)
+	.irq               (irq[0])
 );
 
 ps2 ps2
@@ -615,8 +674,8 @@ ps2 ps2
 	.output_reset_n    (ps2_reset_n),
 	.a20_enable        (a20_enable),
 
-	.irq_keyb          (irq_1),
-	.irq_mouse         (irq_12)
+	.irq_keyb          (irq[1]),
+	.irq_mouse         (irq[12])
 );
 
 rtc rtc
@@ -638,7 +697,7 @@ rtc rtc
 
 	.bootcfg           ({bootcfg[5:2], bootcfg[1:0] ? bootcfg[1:0] : {~fdd0_inserted, fdd0_inserted}}),
 
-	.irq               (irq_8)
+	.irq               (irq[8])
 );
 
 sound sound
@@ -688,10 +747,59 @@ sound sound
 	.fm_mode           (sound_fm_mode),
 	.cms_en            (sound_cms_en),
 
-	.irq_5             (irq_5),
-	.irq_7             (irq_7),
-	.irq_10            (irq_10)
+	.irq               (sb_irq),
+	.irq_5_en          (sb_irq_5_en),
+	.irq_7_en          (sb_irq_7_en),
+	.irq_10_en         (sb_irq_10_en)
 );
+
+gus gus
+(
+	.clk               (clk_sys),
+	.reset             (reset),
+
+	.clock_rate        (clock_rate),
+
+	.io_address8       (iobus_address[8]),
+	.io_address        (iobus_address[3:0]),
+	.writedata         (iobus_writedata[7:0]),
+	.read              (iobus_read),
+	.write             (iobus_write),
+	.readdata          (gus_readdata),
+	.gus_cs            (gus_cs),
+	.fm_cs             (fm_cs),
+	.io_wait           (gus_wait),
+
+	.dma_req           (dma_gus_req),
+	.dma_ack           (dma_gus_ack),
+	.dma_tc            (dma_gus_tc),
+	.dma_readdata      (dma_gus_readdata),
+	.dma_writedata     (dma_gus_writedata),
+
+	.audio_l           (sample_gus_l),
+	.audio_r           (sample_gus_r),
+
+	.irq               (gus_irq),
+
+	.pll_locked        (pll_locked),
+	.SDRAM_DQ          (SDRAM_DQ),
+	.SDRAM_A           (SDRAM_A),
+	.SDRAM_DQML        (SDRAM_DQML),
+	.SDRAM_DQMH        (SDRAM_DQMH),
+	.SDRAM_BA          (SDRAM_BA),
+	.SDRAM_nCS         (SDRAM_nCS),
+	.SDRAM_nWE         (SDRAM_nWE),
+	.SDRAM_nRAS        (SDRAM_nRAS),
+	.SDRAM_nCAS        (SDRAM_nCAS),
+	.SDRAM_CLK         (SDRAM_CLK),
+	.SDRAM_CKE         (SDRAM_CKE)
+
+);
+
+// GUS uses IRQ5 if SB doesn't occupy it, otherwise IRQ7
+assign irq[5]  = (sb_irq_5_en & sb_irq) | (~sb_irq_5_en & gus_irq);
+assign irq[7]  = (sb_irq_7_en & sb_irq) | ( sb_irq_5_en & gus_irq);
+assign irq[10] = (sb_irq_10_en & sb_irq);
 
 uart uart1
 (
@@ -715,7 +823,7 @@ uart uart1
 	.dtr_n             (uart1_dtr_n),
 	.ri_n              (1),
 
-	.irq               (irq_4)
+	.irq               (irq[4])
 );
 
 uart uart2
@@ -740,7 +848,7 @@ uart uart2
 	.dtr_n             (uart2_dtr_n),
 	.ri_n              (1),
 
-	.irq               (irq_3)
+	.irq               (irq[3])
 );
 
 mpu mpu
@@ -760,7 +868,7 @@ mpu mpu
 	.tx                (mpu_tx),
 
 	.double_rate       (1),
-	.irq               (irq_9)
+	.irq               (irq[9])
 );
 
 vga vga
@@ -809,7 +917,7 @@ vga vga
 	.vga_lores         (video_lores),
 	.vga_border        (video_border),
 
-	.irq               (irq_2)
+	.irq               (irq[2])
 );
 
 pic pic
@@ -828,26 +936,8 @@ pic pic
 	.interrupt_vector  (interrupt_vector),
 	.interrupt_done    (interrupt_done),
 	.interrupt_do      (interrupt_do),
-	.interrupt_input   (interrupt)
+	.interrupt_input   (irq)
 );
-
-always @* begin
-	interrupt = 0;
-
-	interrupt[0]  = irq_0;
-	interrupt[1]  = irq_1;
-	interrupt[3]  = irq_3;
-	interrupt[4]  = irq_4;
-	interrupt[5]  = irq_5;
-	interrupt[6]  = irq_6;
-	interrupt[7]  = irq_7;
-	interrupt[8]  = irq_8;
-	interrupt[9]  = irq_9 | irq_2;
-	interrupt[10] = irq_10;
-	interrupt[12] = irq_12;
-	interrupt[14] = irq_14;
-	interrupt[15] = irq_15;
-end
 
 assign mgmt_ide0_cs  = (mgmt_address[15:8] == 8'hF0);
 assign mgmt_ide1_cs  = (mgmt_address[15:8] == 8'hF1);

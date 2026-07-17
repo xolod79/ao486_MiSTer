@@ -114,19 +114,19 @@ wire general_io_write_misc = io_c_write && io_address == 4'h2;
 reg general_vsync;
 reg general_hsync;
 
+reg general_odd_even_page;
+
+reg [1:0] general_clock_select;
+
 reg general_enable_ram;
 reg general_io_space;
-
-//not implemented external regs:
-reg [1:0] general_clock_select;
-reg       general_not_impl_odd_even_page;
 
 //------------------------------------------------------------------------------ general data write
 
 always @(posedge clk_sys) if(general_io_write_misc) general_vsync <= io_writedata[7];
 always @(posedge clk_sys) if(general_io_write_misc) general_hsync <= io_writedata[6];
 
-always @(posedge clk_sys) if(general_io_write_misc) general_not_impl_odd_even_page <= io_writedata[5];
+always @(posedge clk_sys) if(general_io_write_misc) general_odd_even_page <= io_writedata[5];
 
 always @(posedge clk_sys) if(general_io_write_misc) general_clock_select <= io_writedata[3:2];
 
@@ -139,6 +139,40 @@ always @(posedge clk_sys) if(~rst_n) general_io_space <= 1'd0; else if(general_i
 wire host_io_ignored = 
 	(general_io_space    && (io_b_read_valid || io_b_write)) ||
 	(~(general_io_space) && (io_d_read_valid || io_d_write));
+
+//------------------------------------------------------------------------------ 6845 compatibility io
+
+wire hercules_compatibility_io_write = io_b_write && io_address == 4'hF;
+
+wire display_mode_control_io_write = (io_b_write || io_d_write) && ~host_io_ignored && io_address == 4'h8;
+
+//------------------------------------------------------------------------------ 6845 compatibility data
+
+// Hercules Compatibility
+reg herc_window_enabled;   // enables setting the key
+reg herc_2nd_page_enabled; // enables setting the key
+
+wire et4k_window_enabled = herc_window_enabled & herc_2nd_page_enabled;
+
+// Display Mode Control
+reg dmc_bit_5_key;
+reg dmc_bit_7_key;
+
+//wire et4k_key = dmc_bit_5_key & dmc_bit_7_key;
+
+// TODO: The "KEY" must be set in order to...
+// - read Input Status Register Zero bits 5 and 6
+// - read Feature Control Register bit 7
+// - write to the Graphics Controller indices 0x08-0x0F registers
+// - write CRTC indices above 0x18, except indices 0x33 and 0x35 (CRTC 0x35 is protected by CRTC 0x11 bit 7)
+
+//------------------------------------------------------------------------------ 6845 compatibility data write
+
+always @(posedge clk_sys) if(hercules_compatibility_io_write) herc_window_enabled   <= io_writedata[0];
+always @(posedge clk_sys) if(hercules_compatibility_io_write) herc_2nd_page_enabled <= io_writedata[1];
+
+always @(posedge clk_sys) if(display_mode_control_io_write && et4k_window_enabled) dmc_bit_5_key <= io_writedata[5];
+always @(posedge clk_sys) if(display_mode_control_io_write && et4k_window_enabled) dmc_bit_7_key <= io_writedata[7];
 
 //------------------------------------------------------------------------------ sequencer io
 
@@ -156,7 +190,7 @@ reg seq_8dot_char;
 
 reg seq_dotclock_divided;
 
-reg seq_screen_disable; // Disables video output (blanks the screen) and turns off display data fetches, while CRTC synchronization pules are maintained.
+reg seq_screen_disable; // Disables video output (blanks the screen) and turns off display data fetches, while CRTC synchronization pulses are maintained.
 
 reg [3:0] seq_map_write_enable;
 
@@ -172,10 +206,6 @@ reg seq_not_impl_shift_load_2;
 reg seq_not_impl_shift_load_4;
 
 //------------------------------------------------------------------------------ sequencer data write
-
-reg [7:0] seq_reg6, seq_reg7;
-always @(posedge clk_sys) if(~rst_n) seq_reg6 <= 8'd0; else if(seq_io_write && seq_io_index == 3'd6) seq_reg6 <= io_writedata[7:0];
-always @(posedge clk_sys) if(~rst_n) seq_reg7 <= 8'd0; else if(seq_io_write && seq_io_index == 3'd7) seq_reg7 <= io_writedata[7:0];
 
 always @(posedge clk_sys) if(seq_io_write && seq_io_index == 3'd0) seq_async_reset_n <= io_writedata[0];
 always @(posedge clk_sys) if(seq_io_write && seq_io_index == 3'd0) seq_sync_reset_n  <= io_writedata[1];
@@ -195,6 +225,12 @@ always @(posedge clk_sys) if(seq_io_write && seq_io_index == 3'd4) seq_access_ch
 
 always @(posedge clk_sys) if(seq_io_write && seq_io_index == 3'd1) seq_not_impl_shift_load_2 <= io_writedata[2];
 always @(posedge clk_sys) if(seq_io_write && seq_io_index == 3'd1) seq_not_impl_shift_load_4 <= io_writedata[4];
+
+//------------------------------------------------------------------------------ sequencer data write (extended)
+
+reg [7:0] seq_reg6, seq_reg7;
+always @(posedge clk_sys) if(~rst_n) seq_reg6 <= 8'd0; else if(seq_io_write && seq_io_index == 3'd6) seq_reg6 <= io_writedata[7:0];
+always @(posedge clk_sys) if(~rst_n) seq_reg7 <= 8'd0; else if(seq_io_write && seq_io_index == 3'd7) seq_reg7 <= io_writedata[7:0];
 
 //------------------------------------------------------------------------------ sequencer data read
 
@@ -216,15 +252,16 @@ end
 
 reg [5:0] crtc_io_index;
 always @(posedge clk_sys) begin
-	if(~rst_n)                                                      crtc_io_index <= 6'd0;
-	else if(io_b_write && io_address == 4'h4 && ~(host_io_ignored)) crtc_io_index <= io_writedata[5:0];
-	else if(io_d_write && io_address == 4'h4 && ~(host_io_ignored)) crtc_io_index <= io_writedata[5:0];
+	if(~rst_n)                                                                    crtc_io_index <= 6'd0;
+	else if((io_b_write || io_d_write) && ~host_io_ignored && io_address == 4'h4) crtc_io_index <= io_writedata[5:0];
 end
 
-reg crtc_protect;
-wire crtc_io_write = ((io_b_write && io_address == 4'd5) || (io_d_write && io_address == 4'd5)) && ~(host_io_ignored) && (~(crtc_protect) || crtc_io_index >= 5'd8);
+wire crtc_io_write = (io_b_write || io_d_write) && ~host_io_ignored && io_address == 4'd5;
 
-wire crtc_io_write_compare = ((io_b_write && io_address == 4'd5) || (io_d_write && io_address == 4'd5)) && ~(host_io_ignored);
+// When crtc_protect is set, it prevents CRTC registers 0x0-0x7 and 0x35 from being written to, with the exception of
+// - CRTC Register 0x07 bit 4
+// - CRTC Register 0x35 bit 4, 7
+reg crtc_protect;
 
 //------------------------------------------------------------------------------ crtc data
 
@@ -280,104 +317,103 @@ reg         crtc_not_impl_address_clk_div_4;
 
 //------------------------------------------------------------------------------ crtc data write
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h00) crtc_horizontal_total[7:0]     <= io_writedata[7:0];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h01) crtc_horizontal_display_size   <= io_writedata[7:0];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h02) crtc_horizontal_blanking_start[7:0] <= io_writedata[7:0];
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h00) crtc_horizontal_total[7:0]     <= io_writedata[7:0];
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h01) crtc_horizontal_display_size   <= io_writedata[7:0];
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h02) crtc_horizontal_blanking_start[7:0] <= io_writedata[7:0];
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h03) crtc_not_impl_display_enable_skew <= io_writedata[6:5];
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h03) crtc_not_impl_display_enable_skew <= io_writedata[6:5];
 
 always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h03)      crtc_horizontal_blanking_end <= { crtc_horizontal_blanking_end[5], io_writedata[4:0] };
-	else if(crtc_io_write && crtc_io_index == 5'h05) crtc_horizontal_blanking_end <= { io_writedata[7], crtc_horizontal_blanking_end[4:0] };
+	if     (crtc_io_write && ~crtc_protect && crtc_io_index == 6'h03) crtc_horizontal_blanking_end <= { crtc_horizontal_blanking_end[5], io_writedata[4:0] };
+	else if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h05) crtc_horizontal_blanking_end <= { io_writedata[7], crtc_horizontal_blanking_end[4:0] };
 end
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h04) crtc_horizontal_retrace_start[7:0] <= io_writedata[7:0];
-
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h05) crtc_horizontal_retrace_skew <= io_writedata[6:5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h05) crtc_horizontal_retrace_end  <= io_writedata[4:0];
-
-always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h06)      crtc_vertical_total[7:0] <= io_writedata[7:0];
-	else if(crtc_io_write && crtc_io_index == 5'h07) crtc_vertical_total[9:8] <= { io_writedata[5], io_writedata[0] };
-end
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h04) crtc_horizontal_retrace_start[7:0] <= io_writedata[7:0];
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h05) crtc_horizontal_retrace_skew <= io_writedata[6:5];
+always @(posedge clk_sys) if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h05) crtc_horizontal_retrace_end  <= io_writedata[4:0];
 
 always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h10)      crtc_vertical_retrace_start[7:0] <= io_writedata[7:0];
-	else if(crtc_io_write && crtc_io_index == 5'h07) crtc_vertical_retrace_start[9:8] <= { io_writedata[7], io_writedata[2] };
+	if     (crtc_io_write && ~crtc_protect && crtc_io_index == 6'h06) crtc_vertical_total[7:0] <= io_writedata[7:0];
+	else if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h07) crtc_vertical_total[9:8] <= { io_writedata[5], io_writedata[0] };
 end
 
 always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h12)      crtc_vertical_display_size[7:0] <= io_writedata[7:0];
-	else if(crtc_io_write && crtc_io_index == 5'h07) crtc_vertical_display_size[9:8] <= { io_writedata[6], io_writedata[1]};
+	if     (crtc_io_write                  && crtc_io_index == 6'h10) crtc_vertical_retrace_start[7:0] <= io_writedata[7:0];
+	else if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h07) crtc_vertical_retrace_start[9:8] <= { io_writedata[7], io_writedata[2] };
 end
 
 always @(posedge clk_sys) begin
-	if(crtc_io_write_compare && crtc_io_index == 5'h18)       crtc_line_compare[7:0] <= io_writedata[7:0];
-	else if(crtc_io_write_compare && crtc_io_index == 5'h07)  crtc_line_compare[8]   <= io_writedata[4];
-	else if(crtc_io_write_compare && crtc_io_index == 5'h09)  crtc_line_compare[9]   <= io_writedata[6];
+	if     (crtc_io_write                  && crtc_io_index == 6'h12) crtc_vertical_display_size[7:0] <= io_writedata[7:0];
+	else if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h07) crtc_vertical_display_size[9:8] <= { io_writedata[6], io_writedata[1]};
 end
 
 always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h15)       crtc_vertical_blanking_start[7:0] <= io_writedata[7:0];
-	else if(crtc_io_write && crtc_io_index == 5'h07)  crtc_vertical_blanking_start[8]   <= io_writedata[3];
-	else if(crtc_io_write && crtc_io_index == 5'h09)  crtc_vertical_blanking_start[9]   <= io_writedata[5];
-end
-
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h08) crtc_address_byte_panning <= io_writedata[6:5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h08) crtc_row_preset           <= io_writedata[4:0];
-
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h09) crtc_vertical_doublescan  <= io_writedata[7];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h09) crtc_row_max              <= io_writedata[4:0];
-
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h0A) crtc_cursor_off           <= io_writedata[5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h0A) crtc_cursor_row_start     <= io_writedata[4:0];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h0B) crtc_cursor_skew          <= io_writedata[6:5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h0B) crtc_cursor_row_end       <= io_writedata[4:0];
-
-always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h0C)      crtc_address_start[15:8] <= io_writedata[7:0];
-	else if(crtc_io_write && crtc_io_index == 5'h0D) crtc_address_start[7:0]  <= io_writedata[7:0];
+	if     (crtc_io_write && crtc_io_index == 6'h18) crtc_line_compare[7:0] <= io_writedata[7:0];
+	else if(crtc_io_write && crtc_io_index == 6'h07) crtc_line_compare[8]   <= io_writedata[4];
+	else if(crtc_io_write && crtc_io_index == 6'h09) crtc_line_compare[9]   <= io_writedata[6];
 end
 
 always @(posedge clk_sys) begin
-	if(crtc_io_write && crtc_io_index == 5'h0E)      crtc_address_cursor[15:8] <= io_writedata[7:0];
-	else if(crtc_io_write && crtc_io_index == 5'h0F) crtc_address_cursor[7:0]  <= io_writedata[7:0];
+	if     (crtc_io_write                  && crtc_io_index == 6'h15) crtc_vertical_blanking_start[7:0] <= io_writedata[7:0];
+	else if(crtc_io_write && ~crtc_protect && crtc_io_index == 6'h07) crtc_vertical_blanking_start[8]   <= io_writedata[3];
+	else if(crtc_io_write                  && crtc_io_index == 6'h09) crtc_vertical_blanking_start[9]   <= io_writedata[5];
 end
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h11) crtc_protect                   <= io_writedata[7];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h11) crtc_not_impl_5_refresh_cycles <= io_writedata[6];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h11) crtc_enable_vert_int           <= io_writedata[5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h11) crtc_clear_vert_int            <= io_writedata[4];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h11) crtc_vertical_retrace_end      <= io_writedata[3:0];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h08) crtc_address_byte_panning <= io_writedata[6:5];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h08) crtc_row_preset           <= io_writedata[4:0];
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h13) crtc_address_offset[7:0]       <= io_writedata[7:0];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h09) crtc_vertical_doublescan  <= io_writedata[7];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h09) crtc_row_max              <= io_writedata[4:0];
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h14) crtc_address_doubleword        <= io_writedata[6];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h14) crtc_not_impl_address_clk_div_4<= io_writedata[5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h14) crtc_row_underline             <= io_writedata[4:0];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h0A) crtc_cursor_off           <= io_writedata[5];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h0A) crtc_cursor_row_start     <= io_writedata[4:0];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h0B) crtc_cursor_skew          <= io_writedata[6:5];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h0B) crtc_cursor_row_end       <= io_writedata[4:0];
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h16) crtc_vertical_blanking_end <= io_writedata[7:0];
+always @(posedge clk_sys) begin
+	if     (crtc_io_write && crtc_io_index == 6'h0C) crtc_address_start[15:8] <= io_writedata[7:0];
+	else if(crtc_io_write && crtc_io_index == 6'h0D) crtc_address_start[7:0]  <= io_writedata[7:0];
+end
 
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_timing_enable                <= io_writedata[7];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_address_byte                 <= io_writedata[6];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_address_bit0                 <= io_writedata[5];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_not_impl_address_clk_div_2   <= io_writedata[3];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_not_impl_scan_line_clk_div_2 <= io_writedata[2];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_address_bit14                <= io_writedata[1];
-always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 5'h17) crtc_address_bit13                <= io_writedata[0];
+always @(posedge clk_sys) begin
+	if     (crtc_io_write && crtc_io_index == 6'h0E) crtc_address_cursor[15:8] <= io_writedata[7:0];
+	else if(crtc_io_write && crtc_io_index == 6'h0F) crtc_address_cursor[7:0]  <= io_writedata[7:0];
+end
+
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h11) crtc_protect                   <= io_writedata[7];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h11) crtc_not_impl_5_refresh_cycles <= io_writedata[6];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h11) crtc_enable_vert_int           <= io_writedata[5];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h11) crtc_clear_vert_int            <= io_writedata[4];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h11) crtc_vertical_retrace_end      <= io_writedata[3:0];
+
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h13) crtc_address_offset[7:0]       <= io_writedata[7:0];
+
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h14) crtc_address_doubleword        <= io_writedata[6];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h14) crtc_not_impl_address_clk_div_4<= io_writedata[5];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h14) crtc_row_underline             <= io_writedata[4:0];
+
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h16) crtc_vertical_blanking_end <= io_writedata[7:0];
+
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_timing_enable                <= io_writedata[7];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_address_byte                 <= io_writedata[6];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_address_bit0                 <= io_writedata[5];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_not_impl_address_clk_div_2   <= io_writedata[3];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_not_impl_scan_line_clk_div_2 <= io_writedata[2];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_address_bit14                <= io_writedata[1];
+always @(posedge clk_sys) if(crtc_io_write && crtc_io_index == 6'h17) crtc_address_bit13                <= io_writedata[0];
 
 //------------------------------------------------------------------------------ crtc data write (extended)
 
 reg [7:0] crtc_reg31, crtc_reg32, crtc_reg33, crtc_reg34, crtc_reg35, crtc_reg36, crtc_reg37, crtc_reg3f;
 
-always @(posedge clk_sys) if(~rst_n) crtc_reg31 <= 0; else if(crtc_io_write && crtc_io_index == 'h31) crtc_reg31 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg32 <= 0; else if(crtc_io_write && crtc_io_index == 'h32) crtc_reg32 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg33 <= 0; else if(crtc_io_write && crtc_io_index == 'h33) crtc_reg33 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg34 <= 0; else if(crtc_io_write && crtc_io_index == 'h34) crtc_reg34 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg35 <= 0; else if(crtc_io_write && crtc_io_index == 'h35) crtc_reg35 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg36 <= 0; else if(crtc_io_write && crtc_io_index == 'h36) crtc_reg36 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg37 <= 0; else if(crtc_io_write && crtc_io_index == 'h37) crtc_reg37 <= io_writedata;
-always @(posedge clk_sys) if(~rst_n) crtc_reg3f <= 0; else if(crtc_io_write && crtc_io_index == 'h3f) crtc_reg3f <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg31 <= 0; else if(crtc_io_write && crtc_io_index == 6'h31) crtc_reg31 <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg32 <= 0; else if(crtc_io_write && crtc_io_index == 6'h32) crtc_reg32 <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg33 <= 0; else if(crtc_io_write && crtc_io_index == 6'h33) crtc_reg33 <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg34 <= 0; else if(crtc_io_write && crtc_io_index == 6'h34) crtc_reg34 <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg35 <= 0; else if(crtc_io_write && crtc_io_index == 6'h35) crtc_reg35 <= ~crtc_protect ? io_writedata : {io_writedata[7], crtc_reg35[6:5], io_writedata[4], crtc_reg35[3:0]};
+always @(posedge clk_sys) if(~rst_n) crtc_reg36 <= 0; else if(crtc_io_write && crtc_io_index == 6'h36) crtc_reg36 <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg37 <= 0; else if(crtc_io_write && crtc_io_index == 6'h37) crtc_reg37 <= io_writedata;
+always @(posedge clk_sys) if(~rst_n) crtc_reg3f <= 0; else if(crtc_io_write && crtc_io_index == 6'h3f) crtc_reg3f <= io_writedata;
 
 always @(posedge clk_sys) begin
 	if(~rst_n) begin
@@ -399,11 +435,13 @@ always @(posedge clk_sys) begin
 		crtc_line_compare[10]            <= 0;
 	end
 	else if(crtc_io_write && crtc_io_index == 6'h35) begin
-		crtc_vertical_blanking_start[10] <= io_writedata[0];
-		crtc_vertical_total[10]          <= io_writedata[1];
-		crtc_vertical_display_size[10]   <= io_writedata[2];
-		crtc_vertical_retrace_start[10]  <= io_writedata[3];
-		crtc_line_compare[10]            <= io_writedata[4];
+		if (~crtc_protect) begin
+			crtc_vertical_blanking_start[10] <= io_writedata[0];
+			crtc_vertical_total[10]          <= io_writedata[1];
+			crtc_vertical_display_size[10]   <= io_writedata[2];
+			crtc_vertical_retrace_start[10]  <= io_writedata[3];
+		end
+		crtc_line_compare[10]                <= io_writedata[4];
 	end
 end
 
@@ -427,40 +465,40 @@ end
 reg  [7:0] host_io_read_crtc;
 always @(*) begin
 	case(crtc_io_index)
-		'h00: host_io_read_crtc = crtc_horizontal_total[7:0];
-		'h01: host_io_read_crtc = crtc_horizontal_display_size;
-		'h02: host_io_read_crtc = crtc_horizontal_blanking_start[7:0];
-		'h03: host_io_read_crtc = { 1'b1, crtc_not_impl_display_enable_skew, crtc_horizontal_blanking_end[4:0] };
-		'h04: host_io_read_crtc = crtc_horizontal_retrace_start[7:0];
-		'h05: host_io_read_crtc = { crtc_horizontal_blanking_end[5], crtc_horizontal_retrace_skew, crtc_horizontal_retrace_end };
-		'h06: host_io_read_crtc = crtc_vertical_total[7:0];
-		'h07: host_io_read_crtc = { crtc_vertical_retrace_start[9], crtc_vertical_display_size[9], crtc_vertical_total[9], crtc_line_compare[8], crtc_vertical_blanking_start[8],
-		                            crtc_vertical_retrace_start[8], crtc_vertical_display_size[8], crtc_vertical_total[8] };
-		'h08: host_io_read_crtc = { 1'b0, crtc_address_byte_panning, crtc_row_preset };
-		'h09: host_io_read_crtc = { crtc_vertical_doublescan, crtc_line_compare[9], crtc_vertical_blanking_start[9], crtc_row_max };
-		'h0A: host_io_read_crtc = { 2'b0, crtc_cursor_off, crtc_cursor_row_start };
-		'h0B: host_io_read_crtc = { 1'b0, crtc_cursor_skew, crtc_cursor_row_end };
-		'h0C: host_io_read_crtc = crtc_address_start[15:8];
-		'h0D: host_io_read_crtc = crtc_address_start[7:0];
-		'h0E: host_io_read_crtc = crtc_address_cursor[15:8];
-		'h0F: host_io_read_crtc = crtc_address_cursor[7:0];
-		'h10: host_io_read_crtc = crtc_vertical_retrace_start[7:0];
-		'h11: host_io_read_crtc = { crtc_protect, crtc_not_impl_5_refresh_cycles, crtc_enable_vert_int, crtc_clear_vert_int, crtc_vertical_retrace_end };
-		'h12: host_io_read_crtc = crtc_vertical_display_size[7:0];
-		'h13: host_io_read_crtc = crtc_address_offset[7:0];
-		'h14: host_io_read_crtc = { 1'b0, crtc_address_doubleword, crtc_not_impl_address_clk_div_4, crtc_row_underline };
-		'h15: host_io_read_crtc = crtc_vertical_blanking_start[7:0];
-		'h16: host_io_read_crtc = crtc_vertical_blanking_end;
-		'h17: host_io_read_crtc = { crtc_timing_enable, crtc_address_byte, crtc_address_bit0, 1'b0, crtc_not_impl_address_clk_div_2, crtc_not_impl_scan_line_clk_div_2, crtc_address_bit14, crtc_address_bit13 };
-		'h18: host_io_read_crtc = crtc_line_compare[7:0];
-		'h31: host_io_read_crtc = crtc_reg31;
-		'h32: host_io_read_crtc = crtc_reg32;
-		'h33: host_io_read_crtc = crtc_reg33;
-		'h34: host_io_read_crtc = crtc_reg34;
-		'h35: host_io_read_crtc = crtc_reg35;
-		'h36: host_io_read_crtc = crtc_reg36;
-		'h37: host_io_read_crtc = crtc_reg37;
-		'h3f: host_io_read_crtc = crtc_reg3f;
+		6'h00: host_io_read_crtc = crtc_horizontal_total[7:0];
+		6'h01: host_io_read_crtc = crtc_horizontal_display_size;
+		6'h02: host_io_read_crtc = crtc_horizontal_blanking_start[7:0];
+		6'h03: host_io_read_crtc = { 1'b1, crtc_not_impl_display_enable_skew, crtc_horizontal_blanking_end[4:0] };
+		6'h04: host_io_read_crtc = crtc_horizontal_retrace_start[7:0];
+		6'h05: host_io_read_crtc = { crtc_horizontal_blanking_end[5], crtc_horizontal_retrace_skew, crtc_horizontal_retrace_end };
+		6'h06: host_io_read_crtc = crtc_vertical_total[7:0];
+		6'h07: host_io_read_crtc = { crtc_vertical_retrace_start[9], crtc_vertical_display_size[9], crtc_vertical_total[9], crtc_line_compare[8], crtc_vertical_blanking_start[8],
+		                             crtc_vertical_retrace_start[8], crtc_vertical_display_size[8], crtc_vertical_total[8] };
+		6'h08: host_io_read_crtc = { 1'b0, crtc_address_byte_panning, crtc_row_preset };
+		6'h09: host_io_read_crtc = { crtc_vertical_doublescan, crtc_line_compare[9], crtc_vertical_blanking_start[9], crtc_row_max };
+		6'h0A: host_io_read_crtc = { 2'b0, crtc_cursor_off, crtc_cursor_row_start };
+		6'h0B: host_io_read_crtc = { 1'b0, crtc_cursor_skew, crtc_cursor_row_end };
+		6'h0C: host_io_read_crtc = crtc_address_start[15:8];
+		6'h0D: host_io_read_crtc = crtc_address_start[7:0];
+		6'h0E: host_io_read_crtc = crtc_address_cursor[15:8];
+		6'h0F: host_io_read_crtc = crtc_address_cursor[7:0];
+		6'h10: host_io_read_crtc = crtc_vertical_retrace_start[7:0];
+		6'h11: host_io_read_crtc = { crtc_protect, crtc_not_impl_5_refresh_cycles, crtc_enable_vert_int, crtc_clear_vert_int, crtc_vertical_retrace_end };
+		6'h12: host_io_read_crtc = crtc_vertical_display_size[7:0];
+		6'h13: host_io_read_crtc = crtc_address_offset[7:0];
+		6'h14: host_io_read_crtc = { 1'b0, crtc_address_doubleword, crtc_not_impl_address_clk_div_4, crtc_row_underline };
+		6'h15: host_io_read_crtc = crtc_vertical_blanking_start[7:0];
+		6'h16: host_io_read_crtc = crtc_vertical_blanking_end;
+		6'h17: host_io_read_crtc = { crtc_timing_enable, crtc_address_byte, crtc_address_bit0, 1'b0, crtc_not_impl_address_clk_div_2, crtc_not_impl_scan_line_clk_div_2, crtc_address_bit14, crtc_address_bit13 };
+		6'h18: host_io_read_crtc = crtc_line_compare[7:0];
+		6'h31: host_io_read_crtc = crtc_reg31;
+		6'h32: host_io_read_crtc = crtc_reg32;
+		6'h33: host_io_read_crtc = crtc_reg33;
+		6'h34: host_io_read_crtc = crtc_reg34;
+		6'h35: host_io_read_crtc = crtc_reg35;
+		6'h36: host_io_read_crtc = crtc_reg36;
+		6'h37: host_io_read_crtc = crtc_reg37;
+		6'h3f: host_io_read_crtc = crtc_reg3f;
 		default: host_io_read_crtc = 0;
 	endcase
 end
@@ -545,7 +583,7 @@ always @(posedge clk_vga) begin
 	end
 end
 
-//------------------------------------------------------------------------------ graphics controller segment select
+//------------------------------------------------------------------------------ graphics controller (extended) segment select
 
 reg [5:0] seg_rd, seg_wr;
 always @(posedge clk_sys) begin
@@ -632,9 +670,9 @@ end
 
 reg attrib_flip_flop;
 always @(posedge clk_sys) begin
-	if(~rst_n)                                                                                                          attrib_flip_flop <= 1'b0;
-	else if(((io_b_read_valid && io_address == 4'hA) || (io_d_read_valid && io_address == 4'hA)) && ~(host_io_ignored)) attrib_flip_flop <= 1'b0;
-	else if(io_c_write && io_address == 4'h0)                                                                           attrib_flip_flop <= ~attrib_flip_flop;
+	if(~rst_n)                                                                              attrib_flip_flop <= 1'b0;
+	else if((io_b_read_valid || io_d_read_valid) && ~host_io_ignored && io_address == 4'hA) attrib_flip_flop <= 1'b0;
+	else if(io_c_write && io_address == 4'h0)                                               attrib_flip_flop <= ~attrib_flip_flop;
 end
 
 // Attribute Controller Palette Address Source (PAS) changes internal palette RAM access.
@@ -698,8 +736,8 @@ always @(posedge clk_sys) if(attrib_io_write && attrib_io_index == 5'h14) attrib
 
 reg [7:0] attrib_reg16, attrib_reg17;
 
-always @(posedge clk_sys) if(~rst_n) attrib_reg16 <= 8'd0; else if(attrib_io_write && attrib_io_index == 5'h16) attrib_reg16 <= io_writedata[7:0];
-always @(posedge clk_sys) if(~rst_n) attrib_reg17 <= 8'd0; else if(attrib_io_write && attrib_io_index == 5'h17) attrib_reg17 <= io_writedata[7:0];
+always @(posedge clk_sys) if(~rst_n) attrib_reg16 <= 8'd0; else if(attrib_io_write && attrib_io_index == 5'h16) attrib_reg16 <= io_writedata[7:0]; // Miscellaneous
+always @(posedge clk_sys) if(~rst_n) attrib_reg17 <= 8'd0; else if(attrib_io_write && attrib_io_index == 5'h17) attrib_reg17 <= io_writedata[7:0]; // Miscellaneous 1
 
 //------------------------------------------------------------------------------ attribute controller data read
 
@@ -768,9 +806,10 @@ wire host_io_not_displaying;
 
 wire [7:0] host_io_read_wire = 
 	(host_io_ignored)                                            ? 8'hFF :
-	(io_c_read_valid && io_address == 4'hC)                      ? { general_vsync, general_hsync, general_not_impl_odd_even_page, 1'b0, general_clock_select, general_enable_ram, general_io_space } : //misc output reg
+	(io_c_read_valid && io_address == 4'hC)                      ? { general_vsync, general_hsync, general_odd_even_page, 1'b0, general_clock_select, general_enable_ram, general_io_space } : //misc output reg
 	(io_c_read_valid && io_address == 4'h2)                      ? { interrupt, 2'b0, 1'b1, 4'b0 } : //input status 0
-	((io_b_read_valid || io_d_read_valid) && io_address == 4'hA) ? { 4'b0, host_io_vertical_retrace, 2'b0, host_io_not_displaying } : //input status 1
+	((io_b_read_valid || io_d_read_valid) && io_address == 4'hA) ? { ~host_io_vertical_retrace, 3'b0, host_io_vertical_retrace, 2'b0, host_io_not_displaying } : //input status 1
+	((io_b_read_valid || io_d_read_valid) && io_address == 4'h8) ? { dmc_bit_7_key, herc_2nd_page_enabled, dmc_bit_5_key, 5'b00000} : // display mode control
 	(io_c_read_valid && io_address == 4'h0)                      ? { 2'b0, attrib_pas, attrib_io_index } : //attrib read index (regardless the flip-flop state)
 	(io_c_read_valid && io_address == 4'h1)                      ? host_io_read_attrib : //attrib read data
 	(io_c_read_valid && io_address == 4'h4)                      ? { 5'd0, seq_io_index } : //seq index
@@ -802,8 +841,8 @@ wire host_memory_out_of_bounds = |((mem_address[16:15] ^ graph_system_memory) & 
 wire [16:0] host_address_reduced = { ~host_memory_out_of_bounds_mask & mem_address[16:15], mem_address[14:0] };
 
 wire [15:0] host_address =
-	(seq_access_chain4)             ? { host_address_reduced[15:2], 2'b00 } :
-	(~seq_access_odd_even_disabled) ? { host_address_reduced[15:1], 1'b0 } :
+	(seq_access_chain4)             ? { host_address_reduced[15:2], host_write ? seg_wr[1:0] : seg_rd[1:0] } : // segment select allows bank switching (4 banks) when 4 x 64kb plane RAM is active (used by e.g. Alien Carnage)
+	(~seq_access_odd_even_disabled) ? { host_address_reduced[15:1], ~general_odd_even_page } :                 // general_odd_even_page selects the 1=upper/0=lower 64kb page of memory when in odd/even mode
 	                                  host_address_reduced[15:0];
 
 assign vga_memmode = { general_enable_ram, graph_system_memory };
@@ -973,7 +1012,7 @@ always @(posedge clk_vga) if (ce_video) begin
 	if(dot_memory_load_first_in_frame || dot_memory_load_first_in_line_matched || (dot_memory_load_first_in_line && memory_row_scan == 5'd0))  memory_char_map_b <= seq_char_map_b;
 end
 
-// Latch Start Address at Vertical Retrace Start
+// Latch Start Address and Byte Panning at Vertical Retrace Start
 reg [15:0] memory_address_start_reg;
 always @(posedge clk_vga) if (ce_video) begin
 	if(dot_memory_load_vertical_retrace_start)  memory_address_start_reg <= crtc_address_start[15:0] + { 14'd0, crtc_address_byte_panning };
@@ -1373,6 +1412,8 @@ end
 
 //------------------------------------------------------------------------------ sequencer
 
+wire vertical_doublescan = crtc_vertical_doublescan || crtc_row_max == 1'd1;
+
 // VGA
 localparam [2:0] VGA_H_TOTAL_EXTRA = 3'd4; // +5 = +4 zero-based
 localparam [0:0] VGA_V_TOTAL_EXTRA = 1'd1; // +2 = +1 zero-based
@@ -1380,6 +1421,26 @@ localparam [0:0] VGA_V_TOTAL_EXTRA = 1'd1; // +2 = +1 zero-based
 reg  [3:0] dot_cnt;
 reg  [8:0] horiz_cnt;
 reg [10:0] vert_cnt;
+
+wire  [8:0] horiz_total    = crtc_horizontal_total + VGA_H_TOTAL_EXTRA;
+wire [10:0] vert_total     = crtc_vertical_total   + VGA_V_TOTAL_EXTRA;
+
+wire hde = horiz_cnt < crtc_horizontal_display_size;
+wire vde = vert_cnt <= crtc_vertical_display_size;
+
+wire hbs = horiz_cnt      == crtc_horizontal_blanking_start;
+wire hbe = horiz_cnt[5:0] == crtc_horizontal_blanking_end;
+wire vbs = vert_cnt       == crtc_vertical_blanking_start;
+wire vbe = vert_cnt[7:0]  == crtc_vertical_blanking_end;
+wire hss = horiz_cnt      == crtc_horizontal_retrace_start + crtc_horizontal_retrace_skew;
+wire hse = horiz_cnt[4:0] == crtc_horizontal_retrace_end + crtc_horizontal_retrace_skew;
+wire vss = vert_cnt       == crtc_vertical_retrace_start;
+wire vse = vert_cnt[3:0]  == crtc_vertical_retrace_end;
+
+wire horiz_2nd_to_last_cnt = (horiz_cnt == horiz_total - 1'd1);
+wire horiz_last_cnt        = (horiz_cnt == horiz_total);
+wire vert_first_cnt        = (vert_cnt  == 11'd0);
+wire vert_last_cnt         = (vert_cnt  == vert_total);
 
 reg dot_cnt_div;
 always @(posedge clk_vga) if (ce_video) dot_cnt_div <= ~(dot_cnt_div);
@@ -1392,51 +1453,61 @@ wire character_last_dot = dot_cnt_enable && dot_cnt == { ~seq_8dot_char, {3{seq_
 // dot_cnt (the dot counter) is clocked by dot_cnt_enable
 always @(posedge clk_vga) if (ce_video) begin
 	if (dot_cnt_enable) begin
-		if (character_last_dot)                                       dot_cnt <= 4'd0;
-		else                                                          dot_cnt <= dot_cnt + 1'd1;
+		if (character_last_dot)   dot_cnt <= 4'd0;
+		else                      dot_cnt <= dot_cnt + 1'd1;
 	end
 end
 
 // horiz_cnt (the character counter) is clocked by character_last_dot
 always @(posedge clk_vga) if (ce_video) begin
 	if (character_last_dot) begin
-		if (horiz_cnt == crtc_horizontal_total + VGA_H_TOTAL_EXTRA)   horiz_cnt <= 9'd0;
-		else                                                          horiz_cnt <= horiz_cnt + 1'd1;
+		if (horiz_last_cnt)       horiz_cnt <= 9'd0;
+		else                      horiz_cnt <= horiz_cnt + 1'd1;
 	end
 end
 
 // vert_cnt (the scanline counter) is clocked by HSYNC
 always @(posedge clk_vga) if (ce_video) begin
-	if (character_last_dot && horiz_cnt == crtc_horizontal_retrace_start + { 9'h0, crtc_horizontal_retrace_skew }) begin
-		if (vert_cnt == crtc_vertical_total + VGA_V_TOTAL_EXTRA)      vert_cnt <= 11'd0;
-		else                                                          vert_cnt <= vert_cnt + 1'd1;
+	if (character_last_dot && hss) begin
+		if (vert_last_cnt)        vert_cnt <= 11'd0;
+		else                      vert_cnt <= vert_cnt + 1'd1;
 	end
 end
 
 //------------------------------------------------------------------------------ dot memory load
 
-reg dot_memory_load_dot_cnt;
-always @(posedge clk_vga) if (ce_video) begin
-	//dot_memory_load_dot_cnt <= (  seq_8dot_char  && ~(seq_dotclock_divided) &&   dot_cnt_enable  && dot_cnt == 4'd1) || // dot_cnt == 4'b0001   e.g. mode 03 or mode 13
-	//                           (  seq_8dot_char  &&   seq_dotclock_divided  && ~(dot_cnt_enable) && dot_cnt == 4'd5) || // dot_cnt == 4'b0101   e.g. mode 0d
-	//                           (~(seq_8dot_char) && ~(seq_dotclock_divided) &&   dot_cnt_enable  && dot_cnt == 4'd2) || // dot_cnt == 4'b0010   e.g. mode 07
-	//                           (~(seq_8dot_char) &&   seq_dotclock_divided  && ~(dot_cnt_enable) && dot_cnt == 4'd6);   // dot_cnt == 4'b0110   e.g. mode 00_400
-	dot_memory_load_dot_cnt <= (seq_dotclock_divided ^ dot_cnt_enable) && dot_cnt == { 1'b0, seq_dotclock_divided, ~seq_8dot_char, seq_8dot_char };
-end
+// Horizontally offset -2 characters to prime the pipeline and add +1 extra character to accommodate horizontal panning
+//localparam [1:0] PREFETCH_OFFSET    = 2'd2; // amount of horizontal characters needed to prime the pipeline before active display ouput starts
+//localparam       EXTRA_PANNING_CHAR = 1'd1; // amount of horizontal characters needed extra at the end of each line to accommodate possible panning
+//wire horiz_line_fetch = (horiz_total - PREFETCH_OFFSET < horiz_cnt) || (horiz_cnt <= crtc_horizontal_display_size - PREFETCH_OFFSET + EXTRA_PANNING_CHAR);
+//wire horiz_line_fetch = (horiz_total - PREFETCH_OFFSET < horiz_cnt) || (horiz_cnt < crtc_horizontal_display_size);
+//wire horiz_line_fetch = (horiz_total - PREFETCH_OFFSET < horiz_cnt) || hde;
+wire horiz_line_fetch = horiz_2nd_to_last_cnt || horiz_last_cnt || hde;
+wire vert_frame_fetch = vde;
 
-// horizontally shifted -2 whole characters and +dot_memory_load_dot_cnt dots (to accommodate pel shift register data propagation)
-// load +1 extra (to accommodate horizontal panning)
-assign dot_memory_load_active = (crtc_horizontal_total + VGA_H_TOTAL_EXTRA - 2'd2 < horiz_cnt || horiz_cnt < crtc_horizontal_display_size) && (vert_cnt <= crtc_vertical_display_size);
+//reg dot_memory_load_dot_cnt;
+//always @(posedge clk_vga) if (ce_video) begin
+//	//dot_memory_load_dot_cnt <= (  seq_8dot_char  && ~(seq_dotclock_divided) &&   dot_cnt_enable  && dot_cnt == 4'd1) || // dot_cnt == 4'b0001   e.g. mode 03 or mode 13
+//	//                           (  seq_8dot_char  &&   seq_dotclock_divided  && ~(dot_cnt_enable) && dot_cnt == 4'd5) || // dot_cnt == 4'b0101   e.g. mode 0d
+//	//                           (~(seq_8dot_char) && ~(seq_dotclock_divided) &&   dot_cnt_enable  && dot_cnt == 4'd2) || // dot_cnt == 4'b0010   e.g. mode 07
+//	//                           (~(seq_8dot_char) &&   seq_dotclock_divided  && ~(dot_cnt_enable) && dot_cnt == 4'd6);   // dot_cnt == 4'b0110   e.g. mode 00_400
+//	dot_memory_load_dot_cnt <= (seq_dotclock_divided ^ dot_cnt_enable) && dot_cnt == { 1'b0, seq_dotclock_divided, ~seq_8dot_char, seq_8dot_char };
+//end
 
-assign dot_memory_load = dot_memory_load_dot_cnt && dot_memory_load_active;
+//wire dot_memory_load_dot_cnt = 
+//	(  seq_8dot_char  && ~(seq_dotclock_divided) && dot_cnt_enable && dot_cnt == 4'd2) || // dot_cnt == 4'b0010   e.g. mode 03 or mode 13
+//	(  seq_8dot_char  &&   seq_dotclock_divided  && dot_cnt_enable && dot_cnt == 4'd5) || // dot_cnt == 4'b0101   e.g. mode 0d
+//	(~(seq_8dot_char) && ~(seq_dotclock_divided) && dot_cnt_enable && dot_cnt == 4'd3) || // dot_cnt == 4'b0011   e.g. mode 07
+//	(~(seq_8dot_char) &&   seq_dotclock_divided  && dot_cnt_enable && dot_cnt == 4'd6);   // dot_cnt == 4'b0110   e.g. mode 00_400
+wire dot_memory_load_dot_cnt = dot_cnt_enable && dot_cnt == { 1'b0, seq_dotclock_divided, ~(seq_8dot_char & seq_dotclock_divided), seq_8dot_char ~^ seq_dotclock_divided };
 
-assign dot_memory_load_first_in_frame = dot_memory_load_dot_cnt && horiz_cnt == crtc_horizontal_total + VGA_H_TOTAL_EXTRA - 1'd1 && vert_cnt == 1'd0;
-
-assign dot_memory_load_first_in_line  = dot_memory_load_dot_cnt && horiz_cnt == crtc_horizontal_total + VGA_H_TOTAL_EXTRA - 1'd1 && vert_cnt <= crtc_vertical_display_size;
-
+assign dot_memory_load_active                = horiz_line_fetch && vert_frame_fetch;
+assign dot_memory_load                       = dot_memory_load_dot_cnt && dot_memory_load_active;
+assign dot_memory_load_first_in_line         = dot_memory_load_dot_cnt && horiz_2nd_to_last_cnt && vde;
+assign dot_memory_load_first_in_frame        = dot_memory_load_first_in_line && vert_first_cnt;
 assign dot_memory_load_first_in_line_matched = dot_memory_load_first_in_line && (
 	// svga_et4000: when vertical line doubling is active use aligned line compare
-	vert_cnt == crtc_line_compare + (~(crtc_vertical_doublescan || crtc_row_max == 1'd1) || crtc_line_compare[0])
+	vert_cnt == crtc_line_compare + (~vertical_doublescan || crtc_line_compare[0])
 );
 
 //------------------------------------------------------------------------------ blink rate
@@ -1449,62 +1520,116 @@ assign blink_cursor_value = blink_cnt[4]; // = VSYNC rate divided by 16
 
 //------------------------------------------------------------------------------ vga timing signals
 
-reg vgaprep_dot_timing;
-always @(posedge clk_vga) if (ce_video) begin
-	//vgaprep_dot_timing <= (  seq_8dot_char  && ~(seq_dotclock_divided) && dot_cnt_enable && dot_cnt == 4'd5) || // dot_cnt == 4'b0101   e.g. mode 03 or mode 13
-	//                      (  seq_8dot_char  &&   seq_dotclock_divided  && dot_cnt_enable && dot_cnt == 4'd6) || // dot_cnt == 4'b0110   e.g. mode 0d
-	//                      (~(seq_8dot_char) && ~(seq_dotclock_divided) && dot_cnt_enable && dot_cnt == 4'd6) || // dot_cnt == 4'b0110   e.g. mode 07
-	//                      (~(seq_8dot_char) &&   seq_dotclock_divided  && dot_cnt_enable && dot_cnt == 4'd7);   // dot_cnt == 4'b0111   e.g. mode 00_400
-	vgaprep_dot_timing <= dot_cnt_enable && dot_cnt == { 2'b01, ~seq_8dot_char | seq_dotclock_divided, seq_8dot_char ^ seq_dotclock_divided };
-end
+//reg vgaprep_dot_timing;
+//always @(posedge clk_vga) if (ce_video) begin
+//	//vgaprep_dot_timing <= (  seq_8dot_char  && ~(seq_dotclock_divided) && dot_cnt_enable && dot_cnt == 4'd5) || // dot_cnt == 4'b0101   e.g. mode 03 or mode 13
+//	//                      (  seq_8dot_char  &&   seq_dotclock_divided  && dot_cnt_enable && dot_cnt == 4'd6) || // dot_cnt == 4'b0110   e.g. mode 0d
+//	//                      (~(seq_8dot_char) && ~(seq_dotclock_divided) && dot_cnt_enable && dot_cnt == 4'd6) || // dot_cnt == 4'b0110   e.g. mode 07
+//	//                      (~(seq_8dot_char) &&   seq_dotclock_divided  && dot_cnt_enable && dot_cnt == 4'd7);   // dot_cnt == 4'b0111   e.g. mode 00_400
+//	vgaprep_dot_timing <= dot_cnt_enable && dot_cnt == { 2'b01, ~seq_8dot_char | seq_dotclock_divided, seq_8dot_char ^ seq_dotclock_divided };
+//end
 
-reg vgaprep_horiz_blank;
+//wire vgaprep_dot_timing = 
+//	(  seq_8dot_char  && ~(seq_dotclock_divided) &&   dot_cnt_enable  && dot_cnt == 4'd6) || // dot_cnt == 4'b0110   e.g. mode 03 or mode 13
+//	(  seq_8dot_char  &&   seq_dotclock_divided  && ~(dot_cnt_enable) && dot_cnt == 4'd7) || // dot_cnt == 4'b0111   e.g. mode 0d
+//	(~(seq_8dot_char) && ~(seq_dotclock_divided) &&   dot_cnt_enable  && dot_cnt == 4'd7) || // dot_cnt == 4'b0111   e.g. mode 07
+//	(~(seq_8dot_char) &&   seq_dotclock_divided  && ~(dot_cnt_enable) && dot_cnt == 4'd8);   // dot_cnt == 4'b1000   e.g. mode 00_400
+wire vgaprep_dot_timing = (seq_dotclock_divided ^ dot_cnt_enable) && dot_cnt == { ~seq_8dot_char & seq_dotclock_divided, {2{seq_8dot_char | ~seq_dotclock_divided}}, seq_8dot_char ~^ seq_dotclock_divided };
+
+// Split blanking into non-wraparound and wraparound blanking to be able to present top blanking as active display to the scaler
+
+// Horizontal Blanking (Excluding Blanking Wraparound)
+reg vgaprep_horiz_blank_no_wraparound;
 always @(posedge clk_vga) if (ce_video) begin
 	if (vgaprep_dot_timing) begin
-		if      (horiz_cnt      == crtc_horizontal_blanking_start)                        vgaprep_horiz_blank <= 1'b1;
-		else if (horiz_cnt[5:0] == crtc_horizontal_blanking_end && vgaprep_horiz_blank)   vgaprep_horiz_blank <= 1'b0;
+		if      (hbs)                                                            vgaprep_horiz_blank_no_wraparound <= 1'b1;
+		else if ((hbe || horiz_last_cnt) && vgaprep_horiz_blank_no_wraparound)   vgaprep_horiz_blank_no_wraparound <= 1'b0;
 	end
 end
 
-reg vgaprep_vert_blank;
+// Horizontal Blanking Wraparound (when hbe happens in the next line (blanking characters at the left side of the next line))
+reg vgaprep_horiz_blank_wraparound;
 always @(posedge clk_vga) if (ce_video) begin
-	if (vgaprep_dot_timing) if (horiz_cnt == crtc_horizontal_retrace_start + { 9'h0, crtc_horizontal_retrace_skew }) begin
-		if      (vert_cnt      == crtc_vertical_blanking_start)                       vgaprep_vert_blank <= 1'b1;
-		else if (vert_cnt[7:0] == crtc_vertical_blanking_end && vgaprep_vert_blank)   vgaprep_vert_blank <= 1'b0;
+	if (vgaprep_dot_timing) begin
+		if      (~hbe && vgaprep_horiz_blank_no_wraparound && horiz_last_cnt)    vgaprep_horiz_blank_wraparound <= 1'b1;
+		else if ( hbe && vgaprep_horiz_blank_wraparound)                         vgaprep_horiz_blank_wraparound <= 1'b0;
 	end
 end
 
-wire vgaprep_blank = vgaprep_horiz_blank || vgaprep_vert_blank;
+reg [8:0] horiz_overscan_left;
+always @(posedge clk_vga) if (ce_video) begin
+	if (vgaprep_dot_timing) begin
+		if (hbe && vgaprep_horiz_blank_no_wraparound && horiz_cnt < horiz_total) horiz_overscan_left <= horiz_total - horiz_cnt;
+		else if   (vgaprep_horiz_blank_no_wraparound && horiz_last_cnt)          horiz_overscan_left <= 9'd0;
+	end
+end
 
+// Vertical Blanking (Excluding Blanking Wraparound)
+reg vgaprep_vert_blank_no_wraparound;
+always @(posedge clk_vga) if (ce_video) begin
+	if (vgaprep_dot_timing) if (hss) begin
+		if      (vbs)                                                            vgaprep_vert_blank_no_wraparound <= 1'b1;
+		else if ((vbe || vert_last_cnt) && vgaprep_vert_blank_no_wraparound)     vgaprep_vert_blank_no_wraparound <= 1'b0;
+	end
+end
+
+// Vertical Blanking Wraparound (when vbe happens in the next frame (blanking lines at the top of the next frame))
+reg vgaprep_vert_blank_wraparound;
+always @(posedge clk_vga) if (ce_video) begin
+	if (vgaprep_dot_timing) if (hss) begin
+		if      (~vbe && vgaprep_vert_blank_no_wraparound && vert_last_cnt)      vgaprep_vert_blank_wraparound <= 1'b1;
+		else if ( vbe && vgaprep_vert_blank_wraparound)                          vgaprep_vert_blank_wraparound <= 1'b0;
+	end
+end
+
+reg [10:0] vert_overscan_top;
+always @(posedge clk_vga) if (ce_video) begin
+	if (vgaprep_dot_timing) begin
+		if (vbe && vgaprep_vert_blank_no_wraparound && vert_cnt < vert_total)    vert_overscan_top <= vert_total - vert_cnt;
+		else if   (vgaprep_vert_blank_no_wraparound && vert_last_cnt)            vert_overscan_top <= 11'd0;
+	end
+end
+
+wire vgaprep_blank_no_wraparound = vgaprep_horiz_blank_no_wraparound || vgaprep_vert_blank_no_wraparound;
+wire vgaprep_blank_wraparound    = vgaprep_horiz_blank_wraparound    || vgaprep_vert_blank_wraparound;
+//wire vgaprep_horiz_blank = vgaprep_horiz_blank_no_wraparound || vgaprep_horiz_blank_wraparound;
+wire vgaprep_vert_blank  = vgaprep_vert_blank_no_wraparound  || vgaprep_vert_blank_wraparound;
+wire vgaprep_blank = vgaprep_blank_no_wraparound || vgaprep_blank_wraparound;
+
+// Horizontal Sync
 reg vgaprep_horiz_sync;
 always @(posedge clk_vga) if (ce_video) begin
 	if (vgaprep_dot_timing) begin
-		if      (horiz_cnt      == crtc_horizontal_retrace_start + { 9'h0, crtc_horizontal_retrace_skew })                       vgaprep_horiz_sync <= 1'b1;
-		else if (horiz_cnt[4:0] == crtc_horizontal_retrace_end + { 9'h0, crtc_horizontal_retrace_skew } && vgaprep_horiz_sync)   vgaprep_horiz_sync <= 1'b0;
-		else if (horiz_cnt[5:0] == crtc_horizontal_blanking_end && vgaprep_horiz_sync)                                           vgaprep_horiz_sync <= 1'b0; // also end horizontal sync at horizontal blanking end?
+		if      (hss)                          vgaprep_horiz_sync <= 1'b1;
+		else if (hse && vgaprep_horiz_sync)    vgaprep_horiz_sync <= 1'b0;
+		//else if (hbe && vgaprep_horiz_sync)    vgaprep_horiz_sync <= 1'b0; // also end horizontal sync at horizontal blanking end?
 	end
 end
 
+// Vertical Sync
 reg vgaprep_vert_sync;
 always @(posedge clk_vga) if (ce_video) begin
-	if (vgaprep_dot_timing) if (horiz_cnt == crtc_horizontal_retrace_start + { 9'h0, crtc_horizontal_retrace_skew }) begin
-		if      (vert_cnt      == crtc_vertical_retrace_start)                       vgaprep_vert_sync <= 1'b1;
-		else if (vert_cnt[3:0] == crtc_vertical_retrace_end && vgaprep_vert_sync)    vgaprep_vert_sync <= 1'b0;
-		else if (vert_cnt[7:0] == crtc_vertical_blanking_end && vgaprep_vert_sync)   vgaprep_vert_sync <= 1'b0; // also end vertical sync at vertical blanking end?
+	if (vgaprep_dot_timing) if (hss) begin
+		if      (vss)                          vgaprep_vert_sync <= 1'b1;
+		else if (vse && vgaprep_vert_sync)     vgaprep_vert_sync <= 1'b0;
+		//else if (vbe && vgaprep_vert_sync)     vgaprep_vert_sync <= 1'b0; // also end vertical sync at vertical blanking end?
 	end
 end
 
+// Display Enabled
 always @(posedge clk_vga) if (ce_video) begin
 	if (vgaprep_dot_timing) begin
-		if ((horiz_cnt == crtc_horizontal_total + VGA_H_TOTAL_EXTRA || horiz_cnt < crtc_horizontal_display_size) && vert_cnt <= crtc_vertical_display_size)   vgaprep_not_displaying <= 1'b0;
-		else                                                                                                                                                  vgaprep_not_displaying <= 1'b1;
+		if ((horiz_last_cnt || hde) && vde)    vgaprep_not_displaying <= 1'b0;
+		else                                   vgaprep_not_displaying <= 1'b1;
 	end
 end
 
-//------------------------------------------------------------------------------ VBS, VSS, VSE
+//------------------------------------------------------------------------------ Pulse: VBS, VSS, VSE
 
+// Input Status 1 Register - bit 0
+assign host_io_not_displaying   = vgaprep_not_displaying || vgaprep_blank; // 0=active_display, 1=(overscan||blank||sync)
+// Input Status 1 Register - bit 3
 assign host_io_vertical_retrace = vgaprep_vert_sync;
-assign host_io_not_displaying   = vgaprep_not_displaying;
 
 reg vgaprep_vert_blank_last;
 always @(posedge clk_vga) if (ce_video) vgaprep_vert_blank_last <= vgaprep_vert_blank;
@@ -1517,12 +1642,12 @@ assign dot_memory_load_vertical_retrace_end   = ~(host_io_vertical_retrace) && h
 
 //------------------------------------------------------------------------------ vga output
 
-wire hide_overscan = ~vga_border || (~attrib_pelclock_div2 && attrib_reg16[7]); // also hide overscan for high resolution and 16/24/32 bpp color modes
+wire hide_overscan = ~vga_border;
 
-always @(posedge clk_vga) if (ce_video) vgareg_blank <= vgaprep_blank;
+always @(posedge clk_vga) if (ce_video) vgareg_blank <= vgaprep_blank; // blanking gates DAC
 
 reg vgareg_blank_n;
-always @(posedge clk_vga) if (ce_video) vgareg_blank_n <= ~(vgaprep_blank || (hide_overscan && vgaprep_not_displaying));
+always @(posedge clk_vga) if (ce_video) vgareg_blank_n <= ~(vgaprep_blank_no_wraparound || (hide_overscan && vgaprep_not_displaying)); // omit blanking wraparound to show top blanking as active display
 always @(posedge clk_vga) if (ce_video) vga_blank_n <= vgareg_blank_n;
 
 reg vgareg_horiz_sync;
@@ -1534,9 +1659,9 @@ always @(posedge clk_vga) if (ce_video) vgareg_vert_sync <= (vgaprep_vert_sync &
 always @(posedge clk_vga) if (ce_video) vga_vert_sync <= vgareg_vert_sync;
 
 always @(posedge clk_vga) if (ce_video) begin
-	vga_r <= (~seq_screen_disable && ~vgareg_blank) ? { dac_color[17:12], dac_color[17:16] } : 8'd0;
-	vga_g <= (~seq_screen_disable && ~vgareg_blank) ? { dac_color[11:6],  dac_color[11:10] } : 8'd0;
-	vga_b <= (~seq_screen_disable && ~vgareg_blank) ? { dac_color[5:0],   dac_color[5:4]   } : 8'd0;
+	vga_r <= (seq_screen_disable || vgareg_blank) ? 8'd0 : { dac_color[17:12], dac_color[17:16] };
+	vga_g <= (seq_screen_disable || vgareg_blank) ? 8'd0 : { dac_color[11:6],  dac_color[11:10] };
+	vga_b <= (seq_screen_disable || vgareg_blank) ? 8'd0 : { dac_color[5:0],   dac_color[5:4]   };
 end
 
 //------------------------------------------------------------------------------
@@ -1565,7 +1690,7 @@ always @(posedge clk_vga) ce_video_reg <= ce_video;
 assign vga_ce = ce_video_reg & (
 	(vga_flags[1:0] == 3) ? ce_div3 : 
 	                        ~vga_lores | (                                                                                     // when in vga_lores mode (not 4x mode)...
-	                                        ~((crtc_vertical_doublescan | (crtc_row_max == 1)) & vert_cnt[0]) &                // undo vertical doublescan when active (omits odd lines)
+	                                        ~(vertical_doublescan & vert_cnt[0]) &                                             // undo vertical doublescan when active (omits odd lines)
 	                                        (attrib_pelclock_div2 ? pel_color_8bit_cnt : ~seq_dotclock_divided | ~dot_cnt_div) // undo horizontal pixel doubling when active (omits doubled pixels)
 	                                     )
 );
@@ -1576,12 +1701,18 @@ always @(posedge clk_sys) begin
 	vga_rd_seg     <= seg_rd;
 	vga_wr_seg     <= seg_wr;
 	vga_start_addr <= crtc_address_start;
-	vga_width      <= crtc_horizontal_display_size + 1'd1;
+	vga_width      <= hide_overscan ? ((crtc_horizontal_display_size <= crtc_horizontal_blanking_start) ? crtc_horizontal_display_size + 1'd1 : crtc_horizontal_blanking_start + 1'd1)
+	                                : crtc_horizontal_blanking_start + 1'd1 + horiz_overscan_left;
 	vga_stride     <= crtc_address_offset;
-	vga_height     <= crtc_vertical_display_size + 1'd1;
-	vga_flags      <= { crtc_vertical_doublescan || (crtc_row_max == 1),                                                                  // vga_flags[3]   = vertical doublescan
-	                    attrib_pelclock_div2,                                                                                             // vga_flags[2]   = 256-color
-	                    ~attrib_reg16[7] ? 2'b00 : (attrib_reg16[5:4] == 2) ? 2'b10 : (crtc_reg37[7] && crtc_reg37[5]) ? 2'b11 : 2'b01 }; // vga_flags[1:0] = color bit depth
+	vga_height     <= hide_overscan ? ((crtc_vertical_display_size <= crtc_vertical_blanking_start) ? crtc_vertical_display_size + 1'd1 : crtc_vertical_blanking_start + 1'd1)
+	                                : crtc_vertical_blanking_start + 1'd1 + vert_overscan_top;
+	vga_flags      <= { vertical_doublescan,                        // vga_flags[3]   = vertical doublescan
+	                    attrib_pelclock_div2,                       // vga_flags[2]   = 256-color
+	                                                                // vga_flags[1:0] = color bit depth
+	                    ~attrib_reg16[7] ?                 2'b00 :  // NOT Bypass internal palette (disables fb_en)
+	                    (attrib_reg16[5:4] == 2) ?         2'b10 :  // 16bpp
+	                    (crtc_reg37[7] && crtc_reg37[5]) ? 2'b11 :  // 24bpp
+	                                                       2'b01 }; //  8bpp
 	vga_off        <= 1'd0;
 end
 

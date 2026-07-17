@@ -31,9 +31,10 @@ module sound
 	input             clk_audio,
 	input             rst_n,
 
-	output            irq_5,
-	output            irq_7,
-	output            irq_10,
+	output            irq,
+	output            irq_5_en,
+	output reg        irq_7_en,
+	output reg        irq_10_en,
 
 	input       [3:0] address,
 	input             read,
@@ -147,10 +148,7 @@ sound_dsp sound_dsp_inst
 	.sample_value_r    (dsp_value_r)
 );
 
-wire   irq    = irq8 | irq16;
-assign irq_5  = irq & irq_5_en;
-assign irq_7  = irq & irq_7_en;
-assign irq_10 = irq & irq_10_en;
+assign irq    = irq8 | irq16;
 
 //------------------------------------------------------------------------------ opl
 
@@ -252,7 +250,6 @@ always @(posedge clk) begin
 	else if(write && sb_cs && address == 4'h5 && mixer_reg == 'h81) dma_16_en <= writedata[5];
 end
 
-reg irq_7_en, irq_10_en;
 always @(posedge clk) begin
 	if(~rst_n)                                                      {sbp,irq_10_en,irq_7_en} <= 0;
 	else if(write && sb_cs && address == 4'h5 && mixer_reg == 'h80) begin
@@ -262,7 +259,7 @@ always @(posedge clk) begin
 	end
 end
 
-wire irq_5_en = ~irq_7_en & ~irq_10_en;
+assign irq_5_en = ~irq_7_en & ~irq_10_en;
 
 // Mixer Chip:
 // SBPro 2.0 = CT1345

@@ -21,159 +21,7 @@
 
 module emu
 (
-	//Master input clock
-	input         CLK_50M,
-
-	//Async reset from top-level module.
-	//Can be used as initial reset.
-	input         RESET,
-
-	//Must be passed to hps_io module
-	inout  [48:0] HPS_BUS,
-
-	//Base video clock. Usually equals to CLK_SYS.
-	output        CLK_VIDEO,
-
-	//Multiple resolutions are supported using different CE_PIXEL rates.
-	//Must be based on CLK_VIDEO
-	output        CE_PIXEL,
-
-	//Video aspect ratio for HDMI. Most retro systems have ratio 4:3.
-	//if VIDEO_ARX[12] or VIDEO_ARY[12] is set then [11:0] contains scaled size instead of aspect ratio.
-	output [12:0] VIDEO_ARX,
-	output [12:0] VIDEO_ARY,
-
-	output  [7:0] VGA_R,
-	output  [7:0] VGA_G,
-	output  [7:0] VGA_B,
-	output        VGA_HS,
-	output        VGA_VS,
-	output        VGA_DE,    // = ~(VBlank | HBlank)
-	output        VGA_F1,
-	output [1:0]  VGA_SL,
-	output        VGA_SCALER, // Force VGA scaler
-	output        VGA_DISABLE, // analog out is off
-
-	input  [11:0] HDMI_WIDTH,
-	input  [11:0] HDMI_HEIGHT,
-	output        HDMI_FREEZE,
-	output        HDMI_BLACKOUT,
-	output        HDMI_BOB_DEINT,
-
-`ifdef MISTER_FB
-	// Use framebuffer in DDRAM
-	// FB_FORMAT:
-	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
-	//    [3]   : 0=16bits 565 1=16bits 1555
-	//    [4]   : 0=RGB  1=BGR (for 16/24/32 modes)
-	//
-	// FB_STRIDE either 0 (rounded to 256 bytes) or multiple of pixel size (in bytes)
-	output        FB_EN,
-	output  [4:0] FB_FORMAT,
-	output [11:0] FB_WIDTH,
-	output [11:0] FB_HEIGHT,
-	output [31:0] FB_BASE,
-	output [13:0] FB_STRIDE,
-	input         FB_VBL,
-	input         FB_LL,
-	output        FB_FORCE_BLANK,
-
-`ifdef MISTER_FB_PALETTE
-	// Palette control for 8bit modes.
-	// Ignored for other video modes.
-	output        FB_PAL_CLK,
-	output  [7:0] FB_PAL_ADDR,
-	output [23:0] FB_PAL_DOUT,
-	input  [23:0] FB_PAL_DIN,
-	output        FB_PAL_WR,
-`endif
-`endif
-
-	output        LED_USER,  // 1 - ON, 0 - OFF.
-
-	// b[1]: 0 - LED status is system status OR'd with b[0]
-	//       1 - LED status is controled solely by b[0]
-	// hint: supply 2'b00 to let the system control the LED.
-	output  [1:0] LED_POWER,
-	output  [1:0] LED_DISK,
-
-	// I/O board button press simulation (active high)
-	// b[1]: user button
-	// b[0]: osd button
-	output  [1:0] BUTTONS,
-
-	input         CLK_AUDIO, // 24.576 MHz
-	output [15:0] AUDIO_L,
-	output [15:0] AUDIO_R,
-	output        AUDIO_S,   // 1 - signed audio samples, 0 - unsigned
-	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
-
-	//ADC
-	inout   [3:0] ADC_BUS,
-
-	//SD-SPI
-	output        SD_SCK,
-	output        SD_MOSI,
-	input         SD_MISO,
-	output        SD_CS,
-	input         SD_CD,
-
-	//High latency DDR3 RAM interface
-	//Use for non-critical time purposes
-	output        DDRAM_CLK,
-	input         DDRAM_BUSY,
-	output  [7:0] DDRAM_BURSTCNT,
-	output [28:0] DDRAM_ADDR,
-	input  [63:0] DDRAM_DOUT,
-	input         DDRAM_DOUT_READY,
-	output        DDRAM_RD,
-	output [63:0] DDRAM_DIN,
-	output  [7:0] DDRAM_BE,
-	output        DDRAM_WE,
-
-	//SDRAM interface with lower latency
-	output        SDRAM_CLK,
-	output        SDRAM_CKE,
-	output [12:0] SDRAM_A,
-	output  [1:0] SDRAM_BA,
-	inout  [15:0] SDRAM_DQ,
-	output        SDRAM_DQML,
-	output        SDRAM_DQMH,
-	output        SDRAM_nCS,
-	output        SDRAM_nCAS,
-	output        SDRAM_nRAS,
-	output        SDRAM_nWE,
-
-`ifdef MISTER_DUAL_SDRAM
-	//Secondary SDRAM
-	//Set all output SDRAM_* signals to Z ASAP if SDRAM2_EN is 0
-	input         SDRAM2_EN,
-	output        SDRAM2_CLK,
-	output [12:0] SDRAM2_A,
-	output  [1:0] SDRAM2_BA,
-	inout  [15:0] SDRAM2_DQ,
-	output        SDRAM2_nCS,
-	output        SDRAM2_nCAS,
-	output        SDRAM2_nRAS,
-	output        SDRAM2_nWE,
-`endif
-
-	input         UART_CTS,
-	output        UART_RTS,
-	input         UART_RXD,
-	output        UART_TXD,
-	output        UART_DTR,
-	input         UART_DSR,
-
-	// Open-drain User port.
-	// 0 - D+/RX
-	// 1 - D-/TX
-	// 2..6 - USR2..USR6
-	// Set USER_OUT to 1 to read from USER_IN.
-	input   [6:0] USER_IN,
-	output  [6:0] USER_OUT,
-
-	input         OSD_STATUS
+	`include "sys/emu_ports.vh"
 );
 
 //`define DEBUG
@@ -662,10 +510,10 @@ reg         fb_off;
 always @(posedge clk_sys) begin
 	fb_en       <= ~vga_flags[2] && |vga_flags[1:0]; // framebuffer enabled for high resolution and 16-bit/24-bit/32-bit color modes
 	fb_base     <= {4'h3, 6'b111110, vga_start_addr, 2'b00};
-	fb_width    <= (vga_flags[1:0] == 3) ? 12'd640 /*({vga_width, 3'b000}/3)*/ : vga_flags[2] ? {1'b0, vga_width, 2'b00} : {vga_width, 3'b000};
+	fb_width    <= (vga_flags[1:0] == 3) ? 12'd640 /*({vga_width, 3'b000}/3)*/ : vga_flags[2] ? {vga_width, 2'b00} : {vga_width, 3'b000};
 	fb_stride   <= {vga_stride, 3'b000};
-	fb_height   <= vga_flags[3] ? vga_height[10:1] : vga_height;
-	fb_fmt[2:0] <= (vga_flags[1:0] == 3) ? 3'b101 : (vga_flags[1:0] == 2) ? 3'b100 : 3'b011; // 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
+	fb_height   <= ~status[14] && vga_flags[3] ? vga_height[10:1] : vga_height;
+	fb_fmt[2:0] <= (vga_flags[1:0] == 3) ? 3'b101 : (vga_flags[1:0] == 2) ? 3'b100 : 3'b011; // 011=8bpp 100=16bpp 101=24bpp 110=32bpp
 	fb_fmt[4:3] <= {~status[8],~status[9]};
 	fb_off      <= vga_off;
 end
@@ -763,7 +611,7 @@ system system
 	.video_off            (vga_off),
 	.video_fb_en          (fb_en),
 	.video_lores          (~status[14]),
-	.video_border         (status[55]),
+	.video_border         (status[55] && ~fb_en), // hide border for high resolution and 16/24/32 bpp color modes (when fb_en)
 
 	.sample_cms_l         (cms_out_l),
 	.sample_cms_r         (cms_out_r),
@@ -771,6 +619,8 @@ system system
 	.sample_sb_r          (sb_out_r),
 	.sample_opl_l         (opl_out_l),
 	.sample_opl_r         (opl_out_r),
+	.sample_gus_l         (gus_out_l),
+	.sample_gus_r         (gus_out_r),
 	.sound_fm_mode        (status[3]),
 	.sound_cms_en         (status[17]),
 	.sbp                  (sbp),
@@ -850,7 +700,20 @@ system system
 	.DDRAM_BURSTCNT       (DDRAM_BURSTCNT),
 	.DDRAM_BUSY           (DDRAM_BUSY),
 	.DDRAM_RD             (DDRAM_RD),
-	.DDRAM_WE             (DDRAM_WE)
+	.DDRAM_WE             (DDRAM_WE),
+
+	.pll_locked           (pll_locked),
+	.SDRAM_DQ             (SDRAM_DQ),
+	.SDRAM_A              (SDRAM_A),
+	.SDRAM_DQML           (SDRAM_DQML),
+	.SDRAM_DQMH           (SDRAM_DQMH),
+	.SDRAM_BA             (SDRAM_BA),
+	.SDRAM_nCS            (SDRAM_nCS),
+	.SDRAM_nWE            (SDRAM_nWE),
+	.SDRAM_nRAS           (SDRAM_nRAS),
+	.SDRAM_nCAS           (SDRAM_nCAS),
+	.SDRAM_CLK            (SDRAM_CLK),
+	.SDRAM_CKE            (SDRAM_CKE)
 );
 
 wire [7:0] syscfg;
@@ -1012,6 +875,8 @@ always @(posedge CLK_AUDIO) begin
 	spk_out <= spk >> ~vol_spk;
 end
 
+wire [15:0] gus_out_l, gus_out_r;
+
 // CD-DA (Redbook audio)
 wire [15:0] cdda_l;
 wire [15:0] cdda_r;
@@ -1091,13 +956,15 @@ always @(posedge CLK_AUDIO) begin
 		           + {sb_l_swap[15],sb_l_swap}                  // SB DAC/DMA
 		           + {opl_l[15],opl_l}                          // OPL2/3 FM synthesis
 		           + (vol_en[2] ? {cd_l[15],cd_l} : 17'd0)      // CD-DA (Redbook audio)
-		           + (mt32_mute ? 17'd0 : {mt32_l[15],mt32_l}); // MT-32
+		           + (mt32_mute ? 17'd0 : {mt32_l[15],mt32_l})  // MT-32
+		           + {gus_out_l[15],gus_out_l};                 // GUS
 		mix_tmp_r <= spk_out
 		           + {2'b00, cms_out_r, cms_out_r[8:4]}
 		           + {sb_r_swap[15],sb_r_swap}
 		           + {opl_r[15],opl_r}
 		           + (vol_en[1] ? {cd_r[15],cd_r} : 17'd0)
-		           + (mt32_mute ? 17'd0 : {mt32_r[15],mt32_r});
+		           + (mt32_mute ? 17'd0 : {mt32_r[15],mt32_r})
+		           + {gus_out_r[15],gus_out_r};
 	end
 
 	// Hard clip to prevent overflow
