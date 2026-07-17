@@ -2291,7 +2291,7 @@ module gf1
 			dram_dma_irq_pending <= 1'h0;
 		
 		cls9_dma_write = clk_sel[9] & ~clk_sel9_d & ~dram_dma_dir & dram_dma_access;
-		cls9_dma_read = clk_sel[9] & dram_dma_dir & dram_dma_access;
+		cls9_dma_read = clk_sel[9] & ~clk_sel9_d & dram_dma_dir & dram_dma_access;
 		
 		if (cls9_dma_read)
 			dram_dma_req_rd <= 1'h1;
